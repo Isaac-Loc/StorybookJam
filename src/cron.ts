@@ -1,35 +1,30 @@
 /**
- * Cron task definitions — registered into the AppCronRoom DO at construction
- * time (worker.ts). The DO alarm fires `runTask(name, env)` on the schedule
- * declared here; the DO itself records executions, tracks history, and
- * pushes status to admin clients via the `/ws/cron/:roomId` WebSocket.
+ * Scheduled tasks, run by the AppCronRoom Durable Object (see worker.ts).
  *
- * Each task declares EITHER `intervalMinutes` (run every N minutes) OR
- * `schedule` + `timezone` (5-field cron expression). CronRoom validates
- * the config at construction time and throws on ambiguous declarations.
+ * Platform granularity: a task declares `intervalMinutes` (integer 1..10080)
+ * or a 5-field cron `schedule`; the finest supported interval is 1 minute.
+ * We use 15 minutes: expiry is enforced instantly by the actions, so cleanup
+ * only reclaims storage and does not need to be prompt.
  *
- * Example:
- *
- *   import type { CronTask } from 'deepspace/worker'
- *   import { buildCronContext } from 'deepspace/worker'
- *
- *   export const tasks: CronTask[] = [
- *     { name: 'heartbeat', intervalMinutes: 1 },
- *     { name: 'daily-report', schedule: '0 9 * * *', timezone: 'America/New_York' },
- *   ]
- *
- *   export async function runTask(name: string, env: Env): Promise<void> {
- *     const ctx = buildCronContext(env, env.OWNER_USER_ID, `app:${env.DEEPSPACE_APP_ID}`)
- *     if (name === 'heartbeat') {
- *       // …
- *     }
- *   }
+ * Record access: `buildCronContext` has no `deleteWhere`, so we build the same
+ * RBAC-bypassing tools the action routes use (createActionTools), acting as
+ * the app owner. No integrations are called, so no caller JWT is needed.
  */
 
 import type { CronTask } from 'deepspace/worker'
+import type { Env } from '../worker.js'
+import { createActionTools } from './server/action-routes.js'
+import { cleanupExpiredGames } from './server/game/cleanup.js'
 
-export const tasks: CronTask[] = []
+export const CLEANUP_TASK = 'cleanup-expired-rooms'
+/** Max rooms deleted per run; the next run (15 min later) continues any backlog. */
+const CLEANUP_BATCH = 25
 
-export async function runTask(_name: string, _env: unknown): Promise<void> {
-  // No-op — implement your cron tasks here. Dispatch on `_name`.
+export const tasks: CronTask[] = [{ name: CLEANUP_TASK, intervalMinutes: 15 }]
+
+export async function runTask(name: string, env: Env): Promise<void> {
+  if (name !== CLEANUP_TASK) return
+  const tools = createActionTools(env, env.OWNER_USER_ID, '')
+  const { roomsDeleted } = await cleanupExpiredGames(tools, Date.now(), CLEANUP_BATCH)
+  console.info(`[cron] ${CLEANUP_TASK} deleted ${roomsDeleted} expired room(s)`)
 }

@@ -1,0 +1,406 @@
+/**
+ * Game server actions.
+ *
+ * AUTHORIZATION: these run with per-record RBAC off, so every action loads
+ * the record it was pointed at and checks the caller against it. An id taken
+ * from `params` is never trusted on its own:
+ *   - createGame / joinGame  : any signed-in user (the caller only ever adds
+ *                              THEMSELVES to a room).
+ *   - startGame              : caller must be the game's hostId.
+ *   - submitBlank/useSafety  : caller must equal the blank's assignedTo.
+ *   - tick                   : caller must have a membership row in the game.
+ * submitBlank/useSafety also require a CURRENT membership, so a player who was
+ * removed from the room cannot keep acting on a blank.
+ *
+ * Handlers are wrapped with `guarded` in src/actions/index.ts (params shape
+ * check, and no uncaught throws).
+ */
+
+import {
+  BLANK_COUNT,
+  BLANK_SPECS,
+  FILL_SECONDS,
+  MAX_ACTIVE_ROOMS_GLOBAL,
+  MAX_PLAYERS,
+  MIN_PLAYERS,
+  ROOM_TTL_MS,
+  STORY_PAGES,
+  STORY_TITLE,
+  cleanName,
+  cleanWord,
+  dealBlanks,
+  generateCode,
+  isExpired,
+  isValidCode,
+  normalizeCode,
+  pickSafety,
+} from '../../game'
+import type {
+  BlankRecord,
+  DraftRecord,
+  GameAction,
+  GameRecord,
+  Loaded,
+  MembershipRecord,
+  Tools,
+} from './helpers'
+import {
+  fail,
+  findMembership,
+  isDuplicate,
+  listBlanks,
+  listMemberships,
+  loadBlank,
+  loadGame,
+  ok,
+} from './helpers'
+import { cleanupExpiredGames } from './cleanup'
+import { expireGame, settle } from './reveal'
+import { findGameByCode, isOverCapacity, joinRank, syncRoster } from './roster'
+import { capRoster, decideCreate, isStaleClaim } from './rules'
+
+const str = (v: unknown): string => (typeof v === 'string' ? v : '')
+
+/* ------------------------------------------------------------------ */
+/* createGame                                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Gathers the numbers for decideCreate from the games records themselves (no
+ * extra collection). Returns a refusal message, or null when allowed.
+ * Expired-but-not-yet-deleted rooms do not count as active, but they do still
+ * count toward the creation RATE (createdAt) until they are swept.
+ */
+async function checkCreateLimits(tools: Tools, userId: string, now: number): Promise<string | null> {
+  const mine = await tools.query<GameRecord>('games', { where: { hostId: userId }, limit: 100 })
+  // Newest-expiring first: live rooms sort ahead of dead ones, so a page of
+  // MAX+1 rows is enough to know whether the global ceiling is reached.
+  const all = await tools.query<GameRecord>('games', {
+    orderBy: 'expiresAt',
+    orderDir: 'desc',
+    limit: MAX_ACTIVE_ROOMS_GLOBAL + 1,
+  })
+  if (!mine.success || !all.success) return 'Could not create a room right now. Please try again.'
+
+  const decision = decideCreate({
+    now,
+    userCreatedAt: mine.data.records.map((r) => Date.parse(r.createdAt)),
+    userActiveRooms: mine.data.records.filter((r) => !isExpired(r.data, now)).length,
+    globalActiveRooms: all.data.records.filter((r) => !isExpired(r.data, now)).length,
+  })
+  return decision.allowed ? null : decision.message
+}
+
+const EXPIRED_MESSAGE = 'This room has expired.'
+
+export const createGame: GameAction = async ({ userId, params, tools }) => {
+  const name = cleanName(params.name)
+  if (!name) return fail('Pick a display name (1-20 characters).')
+  const now = Date.now()
+
+  // Opportunistic cleanup, in case the scheduled task is not firing. Bounded
+  // to a few rooms and never allowed to block or fail room creation.
+  await bestEffort(() => cleanupExpiredGames(tools, now, 3))
+
+  const limit = await checkCreateLimits(tools, userId, now)
+  if (limit) return fail(limit)
+
+  // Room codes are short on purpose, so collisions are possible: uniqueOn
+  // 'code' makes the DO refuse a duplicate and we simply roll a new code.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = generateCode()
+    const game = await tools.create<GameRecord>('games', {
+      code,
+      hostId: userId,
+      phase: 'lobby',
+      playerIds: [userId],
+      playerNames: { [userId]: name },
+      phaseEndsAt: 0,
+      expiresAt: now + ROOM_TTL_MS,
+      filledCount: 0,
+      totalBlanks: 0,
+      title: '',
+    })
+    if (isDuplicate(game)) continue
+    if (!game.success) return fail(game.error)
+
+    const member = await tools.create<MembershipRecord>('memberships', {
+      gameId: game.data.recordId,
+      userId,
+      name,
+    })
+    if (!member.success && !isDuplicate(member)) {
+      await tools.remove('games', game.data.recordId) // don't leave a host-less room behind
+      return fail(member.error)
+    }
+    return ok({ gameId: game.data.recordId, code })
+  }
+  return fail('Could not allocate a room code, please try again.')
+}
+
+/* ------------------------------------------------------------------ */
+/* joinGame                                                            */
+/* ------------------------------------------------------------------ */
+
+export const joinGame: GameAction = async ({ userId, params, tools }) => {
+  const name = cleanName(params.name)
+  if (!name) return fail('Pick a display name (1-20 characters).')
+  const code = normalizeCode(str(params.code))
+  if (!isValidCode(code)) return fail('That is not a valid room code.')
+
+  const game = await findGameByCode(tools, code)
+  if (!game) return fail('No room with that code.')
+  if (isExpired(game.data, Date.now())) return fail(EXPIRED_MESSAGE)
+
+  // Already in? Succeed idempotently (also lets a player reopen a started game's link).
+  // Re-sync first: if an earlier join created the membership but its roster
+  // sync failed, this retry is what puts the player back into `playerIds`.
+  if (await findMembership(tools, game.id, userId)) {
+    await syncRoster(tools, game.id)
+    return ok({ gameId: game.id, code })
+  }
+  if (game.data.phase !== 'lobby') return fail('That game has already started.')
+  if ((await listMemberships(tools, game.id)).length >= MAX_PLAYERS) return fail('That room is full.')
+
+  const created = await tools.create<MembershipRecord>('memberships', {
+    gameId: game.id,
+    userId,
+    name,
+  })
+  if (!created.success && !isDuplicate(created)) return fail(created.error)
+  if (!created.success) {
+    // Duplicate = double-click / retry: already a member, but heal the roster too.
+    await syncRoster(tools, game.id)
+    return ok({ gameId: game.id, code })
+  }
+
+  // The checks above are not atomic, so several people can pass them for the
+  // last seat. Re-count AFTER creating: if my membership ranks past the
+  // capacity, back out. Rank is deterministic, so exactly the latecomers back out.
+  const all = await listMemberships(tools, game.id)
+  if (isOverCapacity(joinRank(all, created.data.recordId))) {
+    await tools.remove('memberships', created.data.recordId)
+    await syncRoster(tools, game.id)
+    return fail('That room is full.')
+  }
+
+  // Likewise for a start that claimed the room between our phase check and our
+  // insert: startGame claims (creates the storyDraft) BEFORE reading the
+  // roster. If the claim is already visible, we may or may not have been dealt
+  // blanks, so the safe answer is to back out.
+  const claimed = await tools.query<DraftRecord>('storyDrafts', { where: { gameId: game.id }, limit: 1 })
+  if (claimed.success && claimed.data.records.length > 0) {
+    await tools.remove('memberships', created.data.recordId)
+    await syncRoster(tools, game.id)
+    return fail('That game has already started.')
+  }
+
+  if (!(await syncRoster(tools, game.id))) {
+    // Membership exists, so the player is in; the denormalized list will heal on the next sync.
+    console.warn(`[game] roster sync did not converge for game ${game.id}`)
+  }
+  return ok({ gameId: game.id, code })
+}
+
+/* ------------------------------------------------------------------ */
+/* startGame                                                           */
+/* ------------------------------------------------------------------ */
+
+/** Runs a cleanup step, swallowing any failure or thrown error. */
+async function bestEffort(step: () => Promise<unknown>): Promise<void> {
+  try {
+    await step()
+  } catch {
+    /* intentionally ignored */
+  }
+}
+
+/**
+ * CLAIM the start. storyDrafts is unique on gameId, so when the host
+ * double-clicks (or two tabs race) exactly one create succeeds; the loser is
+ * refused and bails out before touching anything else.
+ *
+ * A Duplicate can also be a STALE claim left by a start that died after
+ * claiming (cleanup failed, worker crashed): the game is still `lobby` with no
+ * blanks. Once the claim is old enough (see isStaleClaim) we delete it and
+ * claim once more instead of leaving the room unstartable.
+ */
+async function claimStart(
+  tools: Tools,
+  gameId: string,
+): Promise<{ ok: true; draftId: string } | { ok: false; error: string }> {
+  const draft = { gameId, title: STORY_TITLE, pages: [...STORY_PAGES] }
+  const first = await tools.create<DraftRecord>('storyDrafts', draft)
+  if (first.success) return { ok: true, draftId: first.data.recordId }
+  if (!isDuplicate(first)) return { ok: false, error: first.error }
+
+  const existing = await tools.query<DraftRecord>('storyDrafts', { where: { gameId }, limit: 1 })
+  const leftover = existing.success ? existing.data.records[0] : undefined
+  const current = await loadGame(tools, gameId)
+  if (!leftover || !current) return { ok: false, error: 'The game has already started.' }
+
+  const blankCount = (await listBlanks(tools, gameId)).length
+  const claimAgeMs = Date.now() - Date.parse(leftover.createdAt)
+  if (!isStaleClaim({ phase: current.data.phase, blankCount, claimAgeMs })) {
+    const starting = current.data.phase === 'lobby' && blankCount === 0
+    return {
+      ok: false,
+      error: starting ? 'The game is starting. Try again in a few seconds.' : 'The game has already started.',
+    }
+  }
+
+  await tools.remove('storyDrafts', leftover.recordId)
+  const retry = await tools.create<DraftRecord>('storyDrafts', draft)
+  if (retry.success) return { ok: true, draftId: retry.data.recordId }
+  return { ok: false, error: isDuplicate(retry) ? 'The game has already started.' : retry.error }
+}
+
+export const startGame: GameAction = async ({ userId, params, tools }) => {
+  const game = await loadGame(tools, str(params.gameId))
+  if (!game) return fail('Game not found.')
+  if (isExpired(game.data, Date.now())) return fail(EXPIRED_MESSAGE)
+  if (game.data.hostId !== userId) return fail('Only the host can start the game.')
+  if (game.data.phase !== 'lobby') return fail('The game has already started.')
+
+  const claim = await claimStart(tools, game.id)
+  if (!claim.ok) return fail(claim.error)
+
+  try {
+    // Read the roster only AFTER claiming: joinGame backs out when it sees the claim.
+    // Only the first MAX_PLAYERS (join order) play; anyone past that (should not
+    // happen, joinGame enforces the cap) is removed from the room.
+    const { players: members, overflow } = capRoster(await listMemberships(tools, game.id))
+    for (const extra of overflow) await tools.remove('memberships', extra.id)
+    if (members.length < MIN_PLAYERS) throw new Error(`Need at least ${MIN_PLAYERS} player to start.`)
+
+    const playerIds = members.map((m) => m.data.userId)
+    const assignments = dealBlanks(playerIds)
+    const results = await Promise.all(
+      assignments.map((a) =>
+        tools.create<BlankRecord>('blanks', {
+          gameId: game.id,
+          idx: a.idx,
+          label: BLANK_SPECS[a.idx].label,
+          value: '',
+          filled: 0,
+          source: '',
+          assignedTo: a.assignedTo,
+        }),
+      ),
+    )
+    const failed = results.find((r) => !r.success)
+    if (failed && !failed.success) throw new Error(failed.error)
+
+    const playerNames: Record<string, string> = {}
+    for (const m of members) playerNames[m.data.userId] = m.data.name
+    const go = await tools.update<GameRecord>('games', game.id, {
+      phase: 'filling',
+      phaseEndsAt: Date.now() + FILL_SECONDS * 1000,
+      totalBlanks: BLANK_COUNT,
+      filledCount: 0,
+      playerIds,
+      playerNames,
+    })
+    if (!go.success) throw new Error(go.error)
+    return ok({ gameId: game.id })
+  } catch (e) {
+    // Release the claim so the host can try again instead of being stuck.
+    // Best-effort: an error inside cleanup must not mask the original error
+    // (and a leftover claim is healed by claimStart's stale-claim check).
+    await bestEffort(() => tools.deleteWhere('blanks', { gameId: game.id }))
+    await bestEffort(() => tools.remove('storyDrafts', claim.draftId))
+    return fail(e instanceof Error ? e.message : 'Could not start the game.')
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* submitBlank / useSafetyWord                                         */
+/* ------------------------------------------------------------------ */
+
+type FillContext = { blank: Loaded<BlankRecord>; game: Loaded<GameRecord> }
+
+/**
+ * Shared guard for the two actions that fill one blank: the caller must own
+ * the blank, the game must be in `filling`, and the timer must not have run
+ * out (if it has, run the expiry path and say so).
+ */
+async function authorizeFill(
+  tools: Tools,
+  userId: string,
+  blankId: string,
+): Promise<{ ok: true; ctx: FillContext } | { ok: false; error: string }> {
+  const blank = await loadBlank(tools, blankId)
+  // Same message for "missing" and "not yours" so ids can't be probed.
+  if (!blank || blank.data.assignedTo !== userId) return { ok: false, error: 'That blank is not yours.' }
+  const game = await loadGame(tools, blank.data.gameId)
+  if (!game) return { ok: false, error: 'Game not found.' }
+  if (isExpired(game.data, Date.now())) return { ok: false, error: EXPIRED_MESSAGE }
+  // Being assigned a blank is not enough: the player must still be in the room.
+  if (!(await findMembership(tools, game.id, userId))) return { ok: false, error: 'That blank is not yours.' }
+  if (game.data.phase !== 'filling') return { ok: false, error: 'The game is not accepting words right now.' }
+  if (Date.now() >= game.data.phaseEndsAt) {
+    // Known and accepted: a submit that passed the checks just before the
+    // deadline can overwrite a timeout word written a few ms later. Either
+    // value is a valid word, so the story is unaffected.
+    await expireGame(tools, game.id)
+    return { ok: false, error: "Time's up! Safety words were used for the empty blanks." }
+  }
+  if (blank.data.filled === 1) return { ok: false, error: 'That blank is already filled.' }
+  return { ok: true, ctx: { blank, game } }
+}
+
+export const submitBlank: GameAction = async ({ userId, params, tools }) => {
+  const auth = await authorizeFill(tools, userId, str(params.blankId))
+  if (!auth.ok) return fail(auth.error)
+  const value = cleanWord(params.value)
+  if (!value) return fail('Type a word or short phrase (1-24 characters).')
+
+  const { blank, game } = auth.ctx
+  const u = await tools.update<BlankRecord>('blanks', blank.id, { value, filled: 1, source: 'player' })
+  if (!u.success) return fail(u.error)
+  await settle(tools, game.id)
+  return ok({ blankId: blank.id })
+}
+
+export const useSafetyWord: GameAction = async ({ userId, params, tools }) => {
+  const auth = await authorizeFill(tools, userId, str(params.blankId))
+  if (!auth.ok) return fail(auth.error)
+
+  const { blank, game } = auth.ctx
+  const u = await tools.update<BlankRecord>('blanks', blank.id, {
+    value: pickSafety(blank.data.idx),
+    filled: 1,
+    source: 'safety',
+  })
+  if (!u.success) return fail(u.error)
+  await settle(tools, game.id)
+  return ok({ blankId: blank.id })
+}
+
+/* ------------------------------------------------------------------ */
+/* tick                                                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Called by every player's browser when the countdown hits zero (and every few
+ * seconds afterwards). Safe to call at any time, from any number of clients:
+ * it does nothing unless the game is `filling` and the deadline has passed.
+ */
+export const tick: GameAction = async ({ userId, params, tools }) => {
+  const game = await loadGame(tools, str(params.gameId))
+  // Non-members get the same answer as a missing game.
+  if (!game || !(await findMembership(tools, game.id, userId))) return fail('Game not found.')
+
+  if (isExpired(game.data, Date.now())) return fail(EXPIRED_MESSAGE)
+  if (game.data.phase !== 'filling') return ok({ phase: game.data.phase })
+
+  if (Date.now() >= game.data.phaseEndsAt) {
+    await expireGame(tools, game.id)
+  } else if (game.data.totalBlanks > 0 && game.data.filledCount >= game.data.totalBlanks) {
+    // Everything is filled but the reveal never completed (a failed write):
+    // retry it rather than waiting out the clock.
+    await settle(tools, game.id)
+  }
+  const after = await loadGame(tools, game.id)
+  return ok({ phase: after?.data.phase ?? game.data.phase })
+}
