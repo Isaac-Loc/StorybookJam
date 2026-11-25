@@ -12,7 +12,7 @@ change behavior, limits or decisions, update the relevant section.
   DeepSpace. Deadline was 2026-11-24 23:59 ET. The submission is the live URL,
   the repo and a short written note (see "Writeup" below).
 
-## 0. Resume here (state snapshot, 2026-11-24 about 9:00 PM ET)
+## 0. Resume here (state snapshot, 2026-11-24 about 8:15 PM ET)
 
 Last deployed: release #5, the commit that added the landing-page sample book,
 the new README and the submission-note draft (look up its hash with
@@ -385,7 +385,7 @@ file. So:
   rewrite, images, spend ledger, kill switch, deny-by-default proxy), live
   full-round verified by the developer, handoff docs written and committed.
   Mid-flight: nothing.
-- 2026-11-24 (ET, about 9 PM): landing sample book, README rewrite and
+- 2026-11-24 (ET, about 8:15 PM): landing sample book, README rewrite and
   submission-note draft added and deployed as release #5; handoff prepared for
   continuing in another agent tool (Codex). Mid-flight: nothing; remaining work
   is the developer's review of the note, the final live round, test-account
