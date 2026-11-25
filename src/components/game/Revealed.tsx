@@ -28,6 +28,7 @@ export function Revealed(props: StoryProps) {
 }
 
 type Clip = { idx: number; audioUrl: string }
+type Slide = { index: number; turn: 'forward' | 'backward' | null }
 
 function StorySlideshow({ gameId, title, phase, storyTheme, pageCount }: StoryProps) {
   const theme = getStoryTheme(storyTheme)
@@ -40,7 +41,7 @@ function StorySlideshow({ gameId, title, phase, storyTheme, pageCount }: StoryPr
   const hasNarration = pages.some(({ data }) => data.narrationStatus === 'ready')
   const [clips, setClips] = useState<Clip[] | null>(null)
   const [clipLoad, setClipLoad] = useState(0)
-  const [active, setActive] = useState(0)
+  const [{ index: active, turn }, setSlide] = useState<Slide>({ index: 0, turn: null })
   const [playing, setPlaying] = useState(false)
   const [blocked, setBlocked] = useState(false)
   const [mediaError, setMediaError] = useState<number | null>(null)
@@ -52,6 +53,11 @@ function StorySlideshow({ gameId, title, phase, storyTheme, pageCount }: StoryPr
   const narratable = (clips?.length ?? 0) > 0
   const silentPage = !clip || mediaError === active
   const textLength = pages.find(({ data }) => data.idx === active)?.data.text.length ?? 0
+  const turnTo = useCallback((index: number) => {
+    setSlide((previous) => index === previous.index
+      ? previous
+      : { index, turn: index > previous.index ? 'forward' : 'backward' })
+  }, [])
 
   useEffect(() => {
     if (!bookReady || !hasNarration) return
@@ -105,7 +111,7 @@ function StorySlideshow({ gameId, title, phase, storyTheme, pageCount }: StoryPr
     pausePlayback()
     audio.current?.removeAttribute('src')
     setMediaError(null)
-    setActive(idx)
+    turnTo(idx)
   }
 
   const advance = useCallback(() => {
@@ -115,10 +121,10 @@ function StorySlideshow({ gameId, title, phase, storyTheme, pageCount }: StoryPr
       setPlaying(false)
       return
     }
-    setActive(next)
+    turnTo(next)
     const nextClip = clips?.find(({ idx }) => idx === next)
     startPlayback(nextClip?.audioUrl, next)
-  }, [playing, active, clips, startPlayback, totalPages])
+  }, [playing, active, clips, startPlayback, totalPages, turnTo])
 
   useEffect(() => {
     if (!playing || !silentPage) return
@@ -157,7 +163,7 @@ function StorySlideshow({ gameId, title, phase, storyTheme, pageCount }: StoryPr
       {status === 'loading' || (pages.length === 0 && status !== 'error') ? (
         <p className="text-center text-muted-foreground">Unrolling the story...</p>
       ) : (
-        <section aria-label="Story pages" className="jam-reader-stage" data-testid="story-stage">
+        <section aria-label="Story pages" className="jam-reader-stage" data-turn={turn ?? undefined} data-testid="story-stage">
           {pages.map((p) => (
             <PageCard key={p.recordId} gameId={gameId} page={p.data} theme={theme.id} totalPages={totalPages} hidden={p.data.idx !== active} />
           ))}
@@ -202,7 +208,7 @@ function StorySlideshow({ gameId, title, phase, storyTheme, pageCount }: StoryPr
                 {playing ? 'Pause narration' : 'Play narration'}
               </Button>
               {active > 0 && (
-                <Button type="button" variant="outline" onClick={() => { setActive(0); startPlayback(firstClipUrl, 0) }}>
+                <Button type="button" variant="outline" onClick={() => { turnTo(0); startPlayback(firstClipUrl, 0) }}>
                   Replay from start
                 </Button>
               )}

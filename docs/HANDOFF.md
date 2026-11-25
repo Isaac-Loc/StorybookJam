@@ -5,7 +5,7 @@ Everything an agent (or human) needs to pick this repo up cold. Read this, then
 change behavior, limits or decisions, update the relevant section.
 
 - Live app: https://storybookjam.app.space
-- Repo: https://github.com/Isaac-Loc/StorybookJam (public, default branch `dev`)
+- Repo: https://github.com/Isaac-Loc/StorybookJam (public, default branch `main`)
 - Stack: DeepSpace SDK (Cloudflare Workers + Durable Objects), React + Vite,
   Tailwind v4, vitest, Playwright via `deepspace test`.
 - Context: built as a one-day "ship something small" build exercise on
@@ -14,9 +14,9 @@ change behavior, limits or decisions, update the relevant section.
 
 ## 0. Resume here (state snapshot, 2026-11-24 ET)
 
-The previous verified live release and GitHub `dev` head were at `ccf1e0e`,
-with the current submission note and the gold book tab icon. This checkout
-shows one word prompt at a time. Verify deployment by comparing
+The last verified live release and both GitHub branches were at `ad71e3d`,
+which shows one word prompt at a time. This checkout adds a page-turn
+animation to the slideshow. Verify deployment by comparing
 `npx deepspace releases` with `git rev-parse --short HEAD`. A full round at
 the current maximum text length is unverified live.
 
@@ -112,6 +112,7 @@ Done and live (release history from `npx deepspace releases`):
 | later | b5a2b5e | Longer pages, deadpan tone, and larger finished-story reader |
 | later | fdd7d31 | Original landing and cover art, plus the six-page fax demo |
 | later | ccf1e0e | Current submission note and gold book tab icon |
+| later | ad71e3d | One word prompt at a time |
 
 Use `npx deepspace releases` to verify the currently live commit.
 
@@ -204,6 +205,8 @@ exact transitions.
    reading delay if the story has other clips. A story with no clips only
    advances manually. The reader uses most of the viewport and keeps page
    controls grouped with playback. Players can pause, resume, or turn pages.
+   Manual and automatic page changes animate in the direction of the turn.
+   Browsers with reduced motion enabled change pages immediately.
    Pausing or replaying does not bill.
 
 ### Cleanup and cron
@@ -490,3 +493,5 @@ file. So:
   with generation disabled.
 - 2026-11-24 (ET, evening): changed the fill screen to show one word prompt at
   a time while preserving the shared countdown and player completion.
+- 2026-11-24 (ET, evening): added a directional slideshow page turn and
+  verified manual and narrated turns and reduced-motion behavior.
