@@ -12,10 +12,10 @@ Start here, then read the two documents below before changing anything.
 ## The project in one paragraph
 
 StorybookJam is a multiplayer Mad-Libs picture book on DeepSpace. A signed-in
-host opens a room; each player is secretly dealt blanks and sees only their own
-label; the story is written by Claude, player words are safety-rewritten, and
-four fal illustrations are generated. The hidden data is hidden by the SERVER
-(record permissions), never only by the UI. Live: https://storybookjam.app.space
+host picks a theme and each player gets their own secret blanks. Claude drafts
+and moderates the six-page story, Fal illustrates it, and ElevenLabs narrates
+it. The server enforces blank and draft privacy through record permissions.
+Live: https://storybookjam.app.space
 
 ## Rules that matter most
 
@@ -50,8 +50,8 @@ npm run type-check && npm run lint && npm run test:unit && npm run build
 ```
 
 E2E (about 1.5 min, spends no credits): `npx deepspace test run tests/game.spec.ts`.
-It is limited by the room-creation rate limit to about 5 runs per 2 hours per
-test account; see "Testing" in docs/HANDOFF.md.
+Repeated runs share the local room-creation limits. See "Testing" in
+docs/HANDOFF.md.
 
 ## Where things are
 

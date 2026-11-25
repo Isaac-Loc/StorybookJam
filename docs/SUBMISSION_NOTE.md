@@ -1,81 +1,46 @@
-# Submission note (draft: edit into your own voice, then paste into the portal)
+# StorybookJam
 
-Numbers below were read from the CLI and the repo on 2026-11-24. Re-check any
-number you change. Lines marked [CONFIRM] are things only you can attest to.
+- [Play StorybookJam](https://storybookjam.app.space/)
+- [Read the source on GitHub](https://github.com/Isaac-Loc/StorybookJam/tree/dev)
 
-**Live URL:** https://storybookjam.app.space
-**Repository:** https://github.com/Isaac-Loc/StorybookJam (branch `dev`)
+I built a multiplayer fill-in-the-blank party game. The host opens a room,
+picks a theme, and shares the code. Players each see their own secret prompts
+and have 75 seconds to fill them. Everyone discovers what they wrote together
+when the six-page illustrated story starts reading itself aloud. The landing
+page has a free sample, *The Fax Machine Knows*, that anyone can read or listen
+to without signing in.
 
-## What I built
+The hardest part was keeping the surprise fair. I used DeepSpace's synced
+records and server-side permissions so another player's blanks, the story
+draft, and the image prompts never reach your browser before the reveal.
+Server actions check who is allowed to start a room or submit a word.
+Background jobs create the media and cron deletes expired rooms.
 
-StorybookJam is a multiplayer Mad-Libs picture book. A signed-in host opens a
-room; each player is secretly dealt blanks and sees only their own labels. A
-75-second server timer (with "safety words") fills what players don't. Claude
-writes a fresh four-page silly story, a second model pass rewrites any harmful
-player word, and four illustrations are generated and shown page by page.
-Rooms expire after two hours and are deleted.
+Claude drafts the story and does a safety rewrite. Fal illustrates each
+page, and ElevenLabs reads the finished text. The slideshow advances when
+each clip ends and provides a play button if the browser blocks autoplay.
+I left out video to keep the game fast and the generation cost predictable.
+The sample art was made with the built-in image generator in Codex and its
+audio was made offline, so playing it uses no DeepSpace generation credits.
 
-The technical core is that hidden data is hidden by the server: record
-permissions mean another player's browser never receives your blank, the story
-template or the image prompts. A two-account Playwright test checks the
-WebSocket traffic for this.
+I worked with Claude Code and Codex to build and test the project. Independent
+agent reviews helped catch an integration spending hole, a job authorization
+gap, and a reveal that could get stuck. An early live playthrough caught an
+owner-specific bug: the owner's admin role couldn't read its own blanks.
+There's now a regression test for that case.
 
-## DeepSpace integrations and platform features used
+I used a two-player Playwright test to check that the theme choice and
+completion checkmarks sync, other players' words stay off the WebSocket
+before the reveal, and both players can read the finished story. The
+production build, 169 unit tests, and 14 browser tests passed. Browser
+tests use the free text fallback, and the live release and public sample
+assets were checked separately.
 
-- Integrations: `anthropic/chat-completion` (story draft and safety rewrite)
-  and `fal/run-model` + `fal/get-result` (FLUX schnell illustrations), called
-  only from server actions and a background job.
-- Platform features: synced records with owner-only permissions, server actions
-  (RBAC-off, so each action authorizes the caller), the background job room,
-  a cron task for room cleanup, secrets/env for a generation kill switch, and
-  one-command deploys.
-- Left out on purpose: audio/narration (extra cost, no new value), video
-  (fal compute-priced runs reserve $2, too expensive for a free allowance),
-  and other integrations that wouldn't improve the game. I also explored music
-  as the product (Deezer, iTunes, Spotify, YouTube, Audius). Their terms or
-  limits ruled out a free, ad-free, rule-compliant game, so I changed the idea
-  instead of working around the terms.
+Generation has a server-only ledger, per-host and app-wide limits, and a
+kill switch. As of November 24 ET, the account had used 64.78 of 500 credits
+during development. A fully illustrated and narrated six-page story is
+estimated at roughly 32–37 credits at the current text limit, before image
+retries. A full round at that limit hasn't been measured live.
 
-## Main tradeoff
-
-I chose server-enforced hidden data and hard spend controls over feature
-count. That meant requiring sign-in for everyone (DeepSpace's anonymous
-connections have no stable identity, so guests couldn't hold a hidden blank)
-and keeping generation behind caps: 400 estimated credits overall and 120 per
-host, a kill switch, and a browser route that refuses every paid integration.
-The caps are deliberately conservative estimates: a game's four images measured
-about 5.6 credits (about 1.4 each, settled) plus roughly 0.3 for the two model
-calls, so one game is about 6 credits and the real headroom is larger.
-
-## What the agent did, and what I verified
-
-- I directed Claude (Claude Code) through the design with questions at each
-  product decision. It built the app with an implementer-then-reviewer process:
-  one agent wrote each slice, a second independent read-only agent reviewed it,
-  and I re-ran type-check, lint, unit tests and the build myself before each
-  commit.
-- The reviews found real problems that were then fixed: a spend hole (any
-  signed-in user could call a paid integration through the generic proxy, so
-  the proxy is now deny-by-default), a paid job any member could trigger (now
-  admin-only), a game that could stay stuck in "generating", and a prompt that
-  a player word could break out of.
-- I found one bug by playing the live app myself: as the app owner I'm an
-  automatic admin, and admins couldn't read their own blanks. No automated test
-  caught it because every test account was an ordinary member. It is fixed and
-  now has a regression test. [CONFIRM: your own wording of what you played]
-- Test status: 153 unit tests (13 files) plus a 3-test Playwright spec that
-  runs with generation off so it spends nothing; all pass at the last run.
-- Credits: 33.7 of the 500-credit free allowance used in total (466.3 left) as
-  of this draft, including all development testing and the sample
-  illustrations. Re-read with `npx deepspace app usage --json` before
-  submitting.
-
-## What is unfinished and what I'd do next
-
-- Not covered by automated tests: the full-room (7th player) case, true
-  simultaneous joins, crash recovery inside the Durable Object, and a real
-  failed image followed by a manual Retry.
-- Generated images are served from fal's URLs; copying them into app storage
-  would make them permanent.
-- Next: Cloudflare Turnstile on room creation, rate limiting on join attempts,
-  persistent image storage, and optional narration.
+Given more time, I'd measure a few complete live rounds, rate-limit room-code
+attempts, and test simultaneous joins at the room limit.

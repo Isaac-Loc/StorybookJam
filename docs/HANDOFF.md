@@ -14,11 +14,12 @@ change behavior, limits or decisions, update the relevant section.
 
 ## 0. Resume here (state snapshot, 2026-11-24 ET)
 
-The previously verified live release and GitHub `dev` head were at `b5a2b5e`,
-with longer stories, a deadpan tone, and a larger reader. This checkout
-adds original landing art, theme covers, and the six-page sample
-“The Fax Machine Knows.” Verify deployment by comparing `npx deepspace releases`
-with `git rev-parse --short HEAD`. The longer rounds are unverified live.
+The previous verified live release and GitHub `dev` head were at `fdd7d31`,
+with original landing art, theme covers, and the six-page sample
+“The Fax Machine Knows.” This checkout updates the portal submission note
+and replaces the browser tab icon with the gold book mark. Verify deployment
+by comparing `npx deepspace releases` with `git rev-parse --short HEAD`.
+A full round at the current maximum text length is unverified live.
 
 First five minutes in a new session (read-only, free):
 ```bash
@@ -36,9 +37,9 @@ Next actions, in order (see section 3 for the table):
    pages of “The Fax Machine Knows.” The illustrations and audio are bundled
    files. Opening the landing page and listening costs no credits.
 2. DONE: `README.md` rewritten with the real features, caps and kill switch.
-3. DONE (draft): `docs/SUBMISSION_NOTE.md`. The developer must read it, edit it
-   into their own voice, resolve the `[CONFIRM]` lines, and paste it into the
-   portal. Re-check any number before changing it.
+3. DONE (draft): `docs/SUBMISSION_NOTE.md` reflects the current app and
+   verified tests and balance. The developer reviews the final wording and
+   pastes it into the portal. Re-check any number before changing it.
 4. **Final live check.** Get explicit approval before committing, pushing,
    deploying, or making a paid provider call. Play one full round to verify
    theme-specific generation, checkmarks, page order, autoplay fallback, and
@@ -109,12 +110,12 @@ Done and live (release history from `npx deepspace releases`):
 | later | b2f8e77 | Redesigned frontend and host-selected story themes |
 | later | 4414442 | Six-page stories and bundled sample narration |
 | later | b5a2b5e | Longer pages, deadpan tone, and larger finished-story reader |
+| later | fdd7d31 | Original landing and cover art, plus the six-page fax demo |
 
-This checkout adds the new landing and cover illustrations and replaces the
-public sample. Use `npx deepspace releases` to verify the currently live commit.
+Use `npx deepspace releases` to verify the currently live commit.
 
 Remaining, in priority order:
-1. The developer reviews `docs/SUBMISSION_NOTE.md` and resolves its `[CONFIRM]` lines.
+1. The developer reviews `docs/SUBMISSION_NOTE.md` before submitting it.
 2. One last live round by the developer; read real cost with
    `npx deepspace app usage --json` and update the note's numbers if needed.
 3. Delete the two test accounts at the very end (ask the user first).
@@ -260,6 +261,7 @@ src/components/game/           Lobby, JoinRoom, Filling, Revealed
 tests/game.spec.ts             two-account Playwright spec
 tests/helpers/generation-off.mjs   turns generation off for e2e
 public/story-art/               hero, three theme covers, and six sample illustrations
+public/favicon.ico              gold book tab icon (16, 32, and 48 pixels)
 src/sample-story.ts             static six-page landing sample text and image descriptions
 src/assets/fax-demo-narration.wav  bundled sample audio from offline speech synthesis
 docs/SUBMISSION_NOTE.md        draft of the portal writeup (developer edits it)
@@ -307,8 +309,8 @@ Prompts specified full-bleed, text-free scenes with an editorial look:
 - Windows/PowerShell: passing a multi-line commit message containing double
   quotes to `git commit -m` breaks. Write the message to a file and use
   `git commit -F <file>`.
-- Deploy needs a clean, committed tree. `npx deepspace deploy` ships the LOCAL
-  commit; pushing to GitHub does not deploy. Workflow: commit, deploy, push,
+- Deploy needs a clean, committed tree. `npx deepspace deploy` ships the local
+  commit. A GitHub push alone does not deploy. Workflow: commit, push, deploy,
   then confirm with `npx deepspace releases` that the latest release commit
   is the latest commit that changed app code and that GitHub contains it
   (docs-only commits can legitimately sit ahead of the deployed release).
@@ -319,6 +321,8 @@ Prompts specified full-bleed, text-free scenes with an editorial look:
   `npm run build`. Run all four before any commit.
 - Unit tests use an in-memory fake of the action tools with scriptable
   integrations (`src/server/game/fakeTools.ts`), so no paid calls.
+- The complete local Playwright suite covers the public landing page, auth and
+  WebSocket smoke tests, sign-in across accounts, and the game flow.
 - E2E: `npx deepspace test run tests/game.spec.ts` (about 1.5 minutes). Uses two
   `@deepspace.test` accounts from the developer's pool
   (`npx deepspace test accounts list`; credentials live in
@@ -333,8 +337,8 @@ Prompts specified full-bleed, text-free scenes with an editorial look:
   two-player case also checks that only the host can choose a theme, the other
   player sees the lobby changes, and both get the locked theme at reveal.
 - E2E limits: room creation is rate limited (5 per 10 min per user, 10 active
-  rooms per user, rooms live 2 h), so a test account supports about 5 runs per
-  2 hours. If a run fails at room creation, check for the refusal text before
+  rooms per user, rooms live 2 h). Repeated test runs share the same local
+  limits. If a run fails at room creation, check the refusal text before
   assuming a bug. Local dev state lives in `.wrangler/` (git-ignored).
 - Not covered by automated tests: the 7th-player "room full" path, true
   concurrent joins, the join Retry button, crash recovery inside the Durable
@@ -478,3 +482,6 @@ file. So:
   image generation and replaced the sample with “The Fax Machine Knows.”
   Verified all illustrations and locally synthesized audio in Chromium at
   desktop and phone widths. The demo made no DeepSpace integration calls.
+- 2026-11-24 (ET, evening): refreshed the submission note and project docs,
+  added the gold book tab icon, and ran the complete local browser suite
+  with generation disabled.

@@ -9,7 +9,8 @@ Try it: https://storybookjam.app.space
 
 1. A signed-in host opens a room, picks a story theme, and shares its code.
    Play solo or with up to six players.
-2. Claude writes a six-page story with six blanks. Each blank is
+2. Claude writes a six-page story with six blanks and up to 200 characters
+   per page. Each blank is
    secretly dealt to a player. You see only your own labels ("an animal", "a
    place"), never the surrounding story.
 3. A 75-second timer runs. Stuck? Tap "Use a safety word". When time runs out
@@ -17,8 +18,9 @@ Try it: https://storybookjam.app.space
 4. When every blank is filled, a second model pass swaps harmful words for
    harmless ones. Illustrations and narration are generated for each page,
    and the read-aloud advances the slideshow.
-5. Rooms expire after two hours. Player stories are private. The landing page
-   has a pre-recorded sample that anyone can read or listen to.
+5. Rooms expire after two hours. Player stories are private. Anyone can read
+   or listen to the [sample](https://storybookjam.app.space/#sample), no sign-in
+   required.
 
 The design point: the hidden part is hidden on the server, not just in the
 interface. A player's browser never receives words, story text or image prompts
