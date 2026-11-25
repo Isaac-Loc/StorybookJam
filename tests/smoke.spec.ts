@@ -23,6 +23,9 @@ test.describe('Smoke tests', () => {
     await page.goto('/')
     await waitForApp(page)
     await expect(page.getByTestId('static-landing')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Silly Surprise' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Space Trouble' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Tiny Quest' })).toBeVisible()
     expect(errors).toEqual([])
   })
 

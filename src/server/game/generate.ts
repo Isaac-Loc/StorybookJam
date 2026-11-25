@@ -7,6 +7,8 @@
 import { askClaude } from './llm'
 import { reserveSpend } from './budget'
 import type { Tools } from './helpers'
+import { DEFAULT_STORY_THEME } from '../../story-themes'
+import type { StoryThemeId } from '../../story-themes'
 import type { PolishedPage, StoryDraft } from './story'
 import {
   POLISH_SYSTEM,
@@ -33,11 +35,17 @@ const POLISH_MAX_TOKENS = 4000
  * when generation is off, over budget, or the output fails validation.
  * The reservation is kept even when the call fails: it may have been billed.
  */
-export async function draftStory(tools: Tools, gameId: string, hostId: string, enabled: boolean): Promise<StoryDraft> {
-  if (!enabled) return fixedStory()
-  if ((await reserveSpend(tools, 'llm-story', gameId, 'story', hostId)) !== 'ok') return fixedStory()
-  const text = await askClaude(tools, STORY_SYSTEM, storyUserPrompt(), STORY_MAX_TOKENS)
-  return validateStory(parseModelJson(text)) ?? fixedStory()
+export async function draftStory(
+  tools: Tools,
+  gameId: string,
+  hostId: string,
+  enabled: boolean,
+  theme: StoryThemeId = DEFAULT_STORY_THEME,
+): Promise<StoryDraft> {
+  if (!enabled) return fixedStory(theme)
+  if ((await reserveSpend(tools, 'llm-story', gameId, 'story', hostId)) !== 'ok') return fixedStory(theme)
+  const text = await askClaude(tools, STORY_SYSTEM, storyUserPrompt(theme), STORY_MAX_TOKENS)
+  return validateStory(parseModelJson(text)) ?? fixedStory(theme)
 }
 
 /**

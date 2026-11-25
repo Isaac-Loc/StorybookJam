@@ -6,6 +6,7 @@ import {
   createGame,
   joinGame,
   retryPage,
+  setStoryTheme,
   startGame,
   submitBlank,
   tick,
@@ -16,6 +17,7 @@ import {
 export const actions: Record<string, ActionHandler<Env>> = {
   createGame: guarded(createGame),
   joinGame: guarded(joinGame),
+  setStoryTheme: guarded(setStoryTheme),
   startGame: guarded(startGame),
   submitBlank: guarded(submitBlank),
   useSafetyWord: guarded(useSafetyWord),

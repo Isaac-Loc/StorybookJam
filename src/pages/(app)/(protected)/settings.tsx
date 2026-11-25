@@ -14,10 +14,10 @@ export default function SettingsPage() {
     // (app)/_layout provides (a plain background, or a raised panel), so they
     // stay transparent and inherit it.
     <div className="min-h-full text-foreground">
-      <div className="mx-auto max-w-2xl px-6 py-20">
-        <h1 className="mb-12 text-4xl font-bold tracking-tight">Settings</h1>
+      <div className="jam-container max-w-2xl py-10 sm:py-16">
+        <h1 className="jam-display mb-7">Settings.</h1>
 
-        <section className="rounded-lg border border-border bg-card p-6">
+        <section className="jam-panel p-6">
           <h2 className="mb-4 text-lg font-semibold">Your account</h2>
 
           <dl className="space-y-3 text-sm">

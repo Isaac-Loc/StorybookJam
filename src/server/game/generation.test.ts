@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { COST_ESTIMATE_CREDITS, GENERATION_CAP_CREDITS } from '../../game'
-import { startGame } from './actions'
+import { setStoryTheme, startGame } from './actions'
 import { generationEnabled } from './deps'
 import { askClaude } from './llm'
 import type { GenDeps } from './deps'
@@ -62,6 +62,39 @@ describe('askClaude', () => {
 })
 
 describe('startGame story drafting', () => {
+  it('lets only the host pick a known theme in the lobby and locks the selection on start', async () => {
+    const t = createFakeTools('host')
+    const gameId = await lobby(t)
+    expect(await runAction(setStoryTheme, 'p2', t, { gameId, theme: 'space' })).toMatchObject({ success: false })
+    expect(await runAction(setStoryTheme, 'host', t, { gameId, theme: 'invented' })).toMatchObject({ success: false })
+    expect(await runAction(setStoryTheme, 'host', t, { gameId, theme: 'space' })).toMatchObject({ success: true })
+    expect(t.rows('games')[0].data.lobbyTheme).toBe('space')
+    expect(await runAction(startGame, 'host', t, { gameId, theme: 'invented' })).toMatchObject({ success: false })
+    expect(await runAction(startGame, 'host', t, { gameId }, envFor(false))).toMatchObject({ success: true })
+    expect(t.rows('games')[0].data).toMatchObject({ phase: 'filling', storyTheme: 'space' })
+    expect(t.rows('blanks').map(({ data }) => data.label)).toContain('a made-up planet name')
+    expect(t.rows('storyDrafts')[0].data.title).toBe('Pip and the Crater Caper')
+    expect(await runAction(setStoryTheme, 'host', t, { gameId, theme: 'quest' })).toMatchObject({ success: false })
+    expect(t.integrationCalls).toHaveLength(0)
+  })
+
+  it('uses the host’s explicit choice for generation and refuses changes during the start claim', async () => {
+    const t = createFakeTools('host')
+    const gameId = await lobby(t)
+    await runAction(setStoryTheme, 'host', t, { gameId, theme: 'space' })
+    t.onIntegration(async ({ body }) => {
+      expect(body.messages).toEqual([expect.objectContaining({
+        content: expect.stringContaining('Story theme: Tiny Quest.'),
+      })])
+      expect(await runAction(setStoryTheme, 'host', t, { gameId, theme: 'silly' })).toMatchObject({ success: false })
+      return claudeReply(modelStoryJson())
+    })
+    expect(await runAction(startGame, 'host', t, { gameId, theme: 'quest' }, envFor(true))).toMatchObject({ success: true })
+    expect(t.rows('games')[0].data).toMatchObject({ storyTheme: 'quest', lobbyTheme: 'space' })
+    expect(t.rows('storyDrafts')[0].data.source).toBe('model')
+    expect(t.integrationCalls).toHaveLength(1)
+  })
+
   it('uses the model story: labels on blanks, safety/prompts stored in the draft', async () => {
     const t = createFakeTools('host')
     const gameId = await lobby(t)

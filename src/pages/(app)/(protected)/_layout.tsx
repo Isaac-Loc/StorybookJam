@@ -17,6 +17,7 @@ import { useState } from 'react'
 import { Link, Outlet } from 'react-router-dom'
 import { AuthGate, AuthOverlay } from 'deepspace'
 import { Button } from '@/components/ui'
+import { ThemeArtwork } from '@/components/game/ThemeArtwork'
 
 export default function ProtectedLayout() {
   return (
@@ -30,21 +31,17 @@ function SignedOutPanel() {
   const [showAuthModal, setShowAuthModal] = useState(false)
 
   return (
-    <div className="flex min-h-[60vh] items-center justify-center px-6 py-20">
-      <div className="w-full max-w-sm rounded-lg border border-border bg-card p-8 text-center">
-        <h1 className="text-lg font-semibold text-foreground">Sign in to continue</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          This page is only available to signed-in users.
-        </p>
-        <Button className="mt-6 w-full" onClick={() => setShowAuthModal(true)}>
-          Sign in
-        </Button>
-        <Link
-          to="/"
-          className="mt-4 inline-block text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-        >
-          Back to home
-        </Link>
+    <div className="jam-container flex min-h-[65vh] items-center justify-center py-10">
+      <div className="jam-panel grid w-full max-w-4xl overflow-hidden sm:grid-cols-2">
+        <ThemeArtwork theme="silly" />
+        <div className="flex flex-col items-start justify-center p-6 sm:p-8">
+          <h1 className="jam-display">Sign in to play.</h1>
+          <p className="mt-3 text-base text-muted-foreground">Sign in to host a story or join your friends’ room.</p>
+          <div className="mt-5 flex flex-wrap items-center gap-4">
+            <Button onClick={() => setShowAuthModal(true)}>Sign in</Button>
+            <Link to="/" className="jam-text-link">Back to home</Link>
+          </div>
+        </div>
       </div>
 
       {showAuthModal && <AuthOverlay onClose={() => setShowAuthModal(false)} />}

@@ -14,17 +14,11 @@ change behavior, limits or decisions, update the relevant section.
 
 ## 0. Resume here (state snapshot, 2026-11-24 ET)
 
-Before the local narration and player progress changes, the deployed app
-matched the repo head. After deploying any new changes, verify the latest
-entry of `npx deepspace releases` against `git rev-parse --short HEAD`. The live game is
-unchanged since release #4 (commit 9b21f66), on which the developer played a
-full round with illustrations live. The last app-affecting change added the
-landing-page sample book (commit e9fd4d7, release #5); later commits only
-touch docs, and each docs fix was redeployed, which is why release numbers keep
-moving: do not hard-code release numbers in this file. This checkout adds
-narration, a slideshow, and player progress. Check the release ledger for
-deployment status. Live voice playback and settled narration cost are
-unverified without an approved paid run.
+The last verified live commit and GitHub `dev` head were `7b36c0e`, which
+added narration, a slideshow, and player progress. This checkout revamps the
+frontend and adds host-selected story themes. Verify deployment by comparing
+`npx deepspace releases` with `git rev-parse --short HEAD`. Live voice playback
+and settled narration cost remain unverified without an approved paid run.
 
 First five minutes in a new session (read-only, free):
 ```bash
@@ -47,10 +41,10 @@ Next actions, in order (see section 3 for the table):
 3. DONE (draft): `docs/SUBMISSION_NOTE.md`. The developer must read it, edit it
    into their own voice, resolve the `[CONFIRM]` lines, and paste it into the
    portal. Re-check any number before changing it.
-4. **Final live check.** If shipping narration, get explicit approval before
-   committing, pushing, deploying, or making a paid provider call. Play one
-   full round to verify checkmarks, page order, autoplay fallback, and actual
-   cost. Confirm that the latest
+4. **Final live check.** Get explicit approval before committing, pushing,
+   deploying, or making a paid provider call. Play one full round to verify
+   theme-specific generation, checkmarks, page order, autoplay fallback, and
+   actual cost. Confirm that the latest
    release commit in `npx deepspace releases` is the latest commit that changed
    app code (`git log` shows which later commits are docs-only), and that GitHub
    `dev` contains it. Before submitting, ideally deploy the final commit so the
@@ -69,8 +63,9 @@ not required for anything in this repo.
 ## 1. What the product is
 
 A multiplayer Mad-Libs picture book. A signed-in host creates a room (5-letter
-code). Up to 6 players join. A language model writes a silly four-page story
-with 6 blanks; each blank is secretly dealt to a player, who sees only that
+code). Up to 6 players join. The host picks a story theme in the lobby.
+A language model writes a four-page story in that theme with 6 blanks; each
+blank is secretly dealt to a player, who sees only that
 blank's label ("an animal") and never the story. A 75-second timer runs; a
 player can tap "Use a safety word" and the server fills anything left when time
 runs out. A checkmark shows when a player has filled all their own blanks.
@@ -93,7 +88,7 @@ prompts. Preserve that property in every change.
 | Timer | 75 s fill phase, enforced by the server; clients only display it |
 | Safety words | Per-blank safety words from the story draft; used on tap or when the timer expires |
 | Reveal | Automatic when the last blank is filled. The slideshow tries autoplay and offers manual play and page controls |
-| Tone / art | Silly and absurd; one fixed art style (`ART_STYLE` in `src/game.ts`) |
+| Tone / art | The host chooses Silly Surprise (default, bright watercolor), Space Trouble (retro space comic), or Tiny Quest (cut-paper backyard adventure). The theme guides the story, blank prompts, illustration style, and book accents. |
 | Length | 4 pages, at most 150 characters per page and 600 across the four page bodies |
 | Sharing | No public books. A static pre-made sample book is on the landing page (`public/sample/`) |
 | Room lifetime | 2 hours, then deleted (cron + opportunistic cleanup) |
@@ -112,9 +107,11 @@ Done and live (release history from `npx deepspace releases`):
 | #4 | 9b21f66 | Slice 2: model-written story, safety rewrite, 4 illustrations, spend ledger and caps, kill switch, deny-by-default integration proxy |
 | #5 | e9fd4d7 | Landing page sample book, rewritten README, submission-note draft |
 | later | docs only | Handoff corrections, each redeployed so the live app matches the repo head |
+| later | 7b36c0e | Narrated slideshow and player completion checkmarks |
 
-The commit adding the narrated slideshow also adds player completion
-checkmarks. Use `npx deepspace releases` to see whether that commit is live.
+This checkout adds the new visual design and host theme selection. The
+landing page showcases all three story worlds using existing sample art and
+CSS artwork. Use `npx deepspace releases` to verify the currently live commit.
 
 Remaining, in priority order:
 1. The developer reviews `docs/SUBMISSION_NOTE.md` and resolves its `[CONFIRM]` lines.
@@ -133,7 +130,7 @@ on any game collection (admin may delete `games`, `memberships` and `pages`).
 
 | Collection | Holds | Who can read |
 |---|---|---|
-| `games` | code, hostId, phase, playerIds, playerNames, phaseEndsAt, expiresAt, filledCount, finishedPlayerIds, totalBlanks, title | members who are in `playerIds` (`read: 'shared'`), admin all |
+| `games` | code, hostId, phase, lobbyTheme, storyTheme, playerIds, playerNames, phaseEndsAt, expiresAt, filledCount, finishedPlayerIds, totalBlanks, title | members who are in `playerIds` (`read: 'shared'`), admin all |
 | `memberships` | gameId, userId, name (the authoritative roster; unique per game+user) | own row; admin all |
 | `blanks` | label, value, filled, source, assignedTo | ONLY the assignee (`ownerField: assignedTo`, `read: 'own'` for member AND admin) |
 | `storyDrafts` | drafted template, safety words, image prompts, `finalPrompts` | NO role (server only). Its `uniqueOn gameId` doubles as the "start claimed" lock |
@@ -143,7 +140,7 @@ on any game collection (admin may delete `games`, `memberships` and `pages`).
 
 ### Server actions (`src/server/game/actions.ts`, wired in `src/actions/index.ts`)
 
-`createGame`, `joinGame`, `startGame`, `submitBlank`, `useSafetyWord`, `tick`,
+`createGame`, `joinGame`, `setStoryTheme`, `startGame`, `submitBlank`, `useSafetyWord`, `tick`,
 `retryPage`, `getNarration`. Every action loads the record it was pointed at and checks the
 caller against it, because action tools run with RBAC OFF
 (see the comment at the top of `src/server/action-routes.ts`).
@@ -160,10 +157,16 @@ exact transitions.
 2. `joinGame`: idempotent; membership create is unique per game+user; re-count
    and rank by join order to back out over capacity; `syncRoster` rebuilds
    `playerIds` from memberships with read-back (prevents lost updates).
-3. `startGame`: host only; claim by creating the `storyDrafts` row; one Claude
-   call drafts the story (validated strictly, falls back to the fixed story in
-   `src/game.ts` on any failure/over-budget/kill switch); creates 6 blanks;
-   sets `phaseEndsAt` only after blanks exist. Stale-claim recovery after 60 s.
+3. `setStoryTheme`: validates a preset ID and lets only the host of an open,
+   unexpired lobby change `lobbyTheme`. Everyone in the lobby sees it.
+   `startGame` is host-only and claims the room by creating the `storyDrafts`
+   row. It accepts the host's explicit choice, or uses the saved lobby
+   selection. Missing theme fields fall back to Silly Surprise. One Claude
+   call drafts the story from trusted theme instructions, with a matching fixed
+   story on failure, over budget, or when generation is off. It creates 6
+   blanks and writes `storyTheme` with the transition to filling. Late lobby
+   writes cannot change that locked theme. The timer starts after blanks exist.
+   Stale-claim recovery runs after 60 s.
 4. `submitBlank` / `useSafetyWord`: caller must own the blank and be a current
    member; phase must be `filling`. A late call runs the expiry path. The server
    recount publishes which players filled every assigned blank. Chosen safety
@@ -187,7 +190,9 @@ exact transitions.
    so no double spend). `retryPage` allows manual retries (max 2 per page) only
    when the game is `ready`. In parallel, the job requests one low bitrate MP3
    per page from ElevenLabs, with a unique spend reservation and no paid
-   retries. The game becomes ready once both kinds of media have settled.
+   retries. Illustrations use the locked theme's art direction with the existing
+   moderated prompts. Theme selection adds no integration calls or spend.
+   The game becomes ready once both kinds of media have settled.
 8. `getNarration` checks current membership, room expiry, and the ready phase
    before returning stored clips. The slideshow tries to play page one,
    advances on audio end, and holds a page with unavailable audio for a short
@@ -235,6 +240,8 @@ could spend the owner's credits. Do not loosen it.
 
 ```
 src/game.ts                    shared constants, fixed story, pure helpers
+src/story-themes.ts             preset names, settings, and art direction
+src/jam.css                     site styles and story world accents
 src/schemas/game-schemas.ts    collections + permissions (and its tests)
 src/actions/index.ts           action registry (guarded wrappers)
 src/server/game/               actions, roster, reveal, images, narration, generate, story,
@@ -294,7 +301,9 @@ docs/SUBMISSION_NOTE.md        draft of the portal writeup (developer edits it)
   `tests/helpers/generation-off.mjs`, which appends `GENERATION_ENABLED=false`
   to the generated `.dev.vars` (skipped when `STORYBOOK_REAL_GENERATION=1`, which
   spends real credits). The spec checks skipped illustrations, no narration
-  control, shared player checkmarks, and manual slideshow navigation.
+  control, shared player checkmarks, and manual slideshow navigation. The
+  two-player case also checks that only the host can choose a theme, the other
+  player sees the lobby changes, and both get the locked theme at reveal.
 - E2E limits: room creation is rate limited (5 per 10 min per user, 10 active
   rooms per user, rooms live 2 h), so a test account supports about 5 runs per
   2 hours. If a run fails at room creation, check for the refusal text before
@@ -358,7 +367,7 @@ docs/SUBMISSION_NOTE.md        draft of the portal writeup (developer edits it)
 ## 10. Writeup (the submission note)
 
 The note should cover: what was built; which DeepSpace integrations were used
-(`anthropic`, `fal`, and `elevenlabs` if the narration code ships) and which platform features (realtime records, owner-only
+(`anthropic`, `fal`, and `elevenlabs`) and which platform features (realtime records, owner-only
 permissions, server actions, background jobs, cron, secrets); why other
 integrations were left out; the main tradeoff (server-enforced hidden data and
 hard spend caps over feature count; no guests or video); what the agents
@@ -426,3 +435,6 @@ file. So:
 - 2026-11-24 (ET, evening): added player completion checkmarks and the short
   narrated slideshow. Verified the two-player flow and mocked audio playback.
   A paid live round still needs explicit approval.
+- 2026-11-24 (ET, evening): rebuilt the frontend around the three story
+  worlds and added host theme selection. Verified the local production landing
+  at desktop and phone sizes and the two-player theme flow with generation off.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseModelJson, polishUserPrompt, validatePolished, validateStory, fixedStory, POLISH_SYSTEM } from './story'
+import { STORY_THEMES } from '../../story-themes'
 import { modelPolishJson, modelStoryJson } from './testSeed'
 
 const mutate = (fn: (j: ReturnType<typeof modelStoryJson>) => void) => {
@@ -89,11 +90,12 @@ describe('prompts', () => {
     expect(POLISH_SYSTEM).not.toContain(evil)
     expect(POLISH_SYSTEM).toMatch(/UNTRUSTED/)
   })
-  it('the fixed story is itself a valid-shaped draft', () => {
-    const f = fixedStory()
-    expect(f.pages).toHaveLength(4)
-    expect(f.imagePrompts).toHaveLength(4)
-    expect(f.labels).toHaveLength(6)
-    expect(f.source).toBe('fixed')
+  it.each(STORY_THEMES)('$name has a fallback that passes the same length and blank checks as model output', ({ id }) => {
+    const f = fixedStory(id)
+    expect(validateStory({
+      title: f.title,
+      blanks: f.labels.map((label, i) => ({ label, safety: f.safety[i] })),
+      pages: f.pages.map((text, i) => ({ text, imagePrompt: f.imagePrompts[i] })),
+    })).toMatchObject({ title: f.title, pages: f.pages, labels: f.labels })
   })
 })

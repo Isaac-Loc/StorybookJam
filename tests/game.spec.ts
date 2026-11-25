@@ -21,12 +21,12 @@ test.skip(
 )
 
 const BLANK_LABELS = [
-  'an animal',
-  'a silly adjective',
-  'a place',
-  'a food',
-  "something you'd find in a kitchen",
-  'a sound',
+  'a small animal',
+  'a made-up planet name',
+  'a snack for a long trip',
+  'a strange alien creature',
+  'a silly space sound',
+  'a funny thing to find in a rocket',
 ]
 
 /** Record every text frame the server sends this page over any WebSocket. */
@@ -98,10 +98,17 @@ test('two players: blanks stay private, then the story reveals with both words',
   }
   await expect(a.page.getByTestId('start-game')).toBeEnabled()
   await expect(b.page.getByTestId('start-game')).toHaveCount(0) // host only
+  await expect(b.page.getByRole('radio')).toHaveCount(0)
+  await expect(a.page.getByRole('radio', { name: /Silly Surprise/ })).toBeChecked()
+  await a.page.getByText('Tiny Quest', { exact: true }).click()
+  await expect(b.page.getByTestId('selected-story-theme')).toContainText('Tiny Quest')
+  await a.page.getByText('Space Trouble', { exact: true }).click()
+  await expect(b.page.getByTestId('selected-story-theme')).toContainText('Space Trouble')
 
   await a.page.getByTestId('start-game').click()
   for (const p of [a.page, b.page]) {
     await expect(p.getByTestId('blank-card').first()).toBeVisible({ timeout: 20_000 })
+    await expect(p.getByTestId('active-story-theme')).toHaveText('Space Trouble')
     await expect(p.getByTestId('player-progress').getByRole('listitem')).toHaveCount(2)
     await expect(p.getByTestId('player-progress').locator('[data-finished="true"]')).toHaveCount(0)
   }
@@ -136,7 +143,7 @@ test('two players: blanks stay private, then the story reveals with both words',
 
   // The story text and title must not travel to B before the reveal either.
   // (Distinctive bits of the title and of two different page templates.)
-  const STORY_BITS = ['Gerald', 'Giant Problem', 'strange noise', 'floated gently']
+  const STORY_BITS = ['Crater Caper', 'Captain Pip', 'zoomed out of a crater', 'blasted off']
   for (const bit of STORY_BITS) {
     expect(wire).not.toContain(bit)
     expect(bTextAfter).not.toContain(bit)
@@ -146,7 +153,8 @@ test('two players: blanks stay private, then the story reveals with both words',
   const bWords = await fillAll(b.page, 'Bobzz')
   for (const p of [a.page, b.page]) {
     await expect(p.getByTestId('story-page')).toHaveCount(4, { timeout: 30_000 })
-    await expect(p.getByTestId('story-title')).toHaveText(/Gerald/)
+    await expect(p.getByTestId('story-title')).toHaveText(/Crater Caper/)
+    await expect(p.getByTestId('active-story-theme')).toHaveText('Space Trouble')
     await expect(p.getByTestId('story-page').filter({ visible: true })).toHaveCount(1)
     await expect(p.getByRole('button', { name: 'Page 1', exact: true })).toHaveAttribute('aria-current', 'page')
     await p.getByRole('button', { name: 'Next' }).click()
@@ -165,8 +173,8 @@ test('two players: blanks stay private, then the story reveals with both words',
   }
   // Meaningfulness check: after the reveal the same text DOES reach B's socket,
   // so its absence above is real and not a broken capture.
-  await expect.poll(() => bFrames.join('\n').includes('strange noise'), { timeout: 10_000 }).toBe(true)
-  expect(bFrames.join('\n')).toContain('Gerald')
+  await expect.poll(() => bFrames.join('\n').includes('zoomed out of a crater'), { timeout: 10_000 }).toBe(true)
+  expect(bFrames.join('\n')).toContain('Crater Caper')
 })
 
 // One solo room covers four things (rooms are rate limited per account, see the

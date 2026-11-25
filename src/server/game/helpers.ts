@@ -9,6 +9,7 @@
 
 import type { ActionHandler, ActionResult, ActionTools } from 'deepspace/worker'
 import type { BlankSource, GamePhase, ImageStatus, NarrationStatus } from '../../game'
+import type { StoryThemeId } from '../../story-themes'
 import type { GameEnv } from './deps'
 import { byJoinOrder, isParamsObject } from './rules'
 
@@ -41,6 +42,8 @@ export type GameRecord = {
   code: string
   hostId: string
   phase: GamePhase
+  lobbyTheme?: StoryThemeId
+  storyTheme?: StoryThemeId
   playerIds: string[]
   playerNames: Record<string, string>
   phaseEndsAt: number

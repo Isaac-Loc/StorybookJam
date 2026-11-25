@@ -5,11 +5,14 @@
  */
 
 import type { GamePhase, NarrationStatus } from '../../game'
+import type { StoryThemeId } from '../../story-themes'
 
 export type GameView = {
   code: string
   hostId: string
   phase: GamePhase
+  lobbyTheme?: StoryThemeId
+  storyTheme?: StoryThemeId
   playerIds: string[]
   playerNames: Record<string, string>
   phaseEndsAt: number

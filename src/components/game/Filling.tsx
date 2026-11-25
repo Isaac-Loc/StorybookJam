@@ -11,11 +11,12 @@
  */
 
 import { useEffect, useState } from 'react'
-import { Check } from 'lucide-react'
+import { Check, Clock3 } from 'lucide-react'
 import { Badge, Button, Input, useToast } from '@/components/ui'
 import { useQuery } from 'deepspace'
 import { callAction } from '@/lib/callAction'
 import { WORD_MAX_LENGTH } from '../../game'
+import { getStoryTheme } from '../../story-themes'
 import type { BlankView, GameView } from './types'
 
 const TICK_RETRY_MS = 3000
@@ -52,29 +53,35 @@ export function Filling({ gameId, game }: { gameId: string; game: GameView }) {
   const mine = [...records].sort((a, b) => a.data.idx - b.data.idx)
   const mm = String(Math.floor(secondsLeft / 60))
   const ss = String(secondsLeft % 60).padStart(2, '0')
+  const theme = getStoryTheme(game.storyTheme)
 
   return (
-    <div className="mx-auto max-w-lg space-y-6 px-6 py-10">
-      <ul aria-label="Player progress" className="flex flex-wrap justify-center gap-2" data-testid="player-progress">
-        {game.playerIds.map((id) => {
-          const finished = game.finishedPlayerIds?.includes(id) ?? false
-          return (
-            <li key={id} data-finished={finished} className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-sm">
-              {game.playerNames[id] ?? 'Player'}
-              {finished && <Check aria-hidden="true" className="size-4 text-green-600 dark:text-green-400" />}
-              <span className="sr-only">: {finished ? 'Finished' : 'Still filling words'}</span>
-            </li>
-          )
-        })}
-      </ul>
-      <header className="text-center">
-        <p className="font-mono text-5xl font-bold tabular-nums" data-testid="countdown">
-          {mm}:{ss}
-        </p>
-        <p className="mt-2 text-sm text-muted-foreground" data-testid="progress">
-          {game.filledCount} of {game.totalBlanks} blanks filled
-        </p>
-        {expired && <p className="mt-1 text-sm text-warning">Time is up! Finishing the story...</p>}
+    <div className="jam-room jam-container max-w-2xl space-y-5 py-8 sm:py-12" data-world={theme.id}>
+      <header className="jam-stage p-4 sm:p-6">
+        <ul aria-label="Player progress" className="mb-4 flex flex-wrap gap-2" data-testid="player-progress">
+          {game.playerIds.map((id) => {
+            const finished = game.finishedPlayerIds?.includes(id) ?? false
+            return (
+              <li key={id} data-finished={finished} className="inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-sm font-semibold data-[finished=true]:border-green-700/30 data-[finished=true]:bg-green-50">
+                <span className="min-w-0 break-words">{game.playerNames[id] ?? 'Player'}</span>
+                {finished && <Check aria-hidden="true" className="size-4 shrink-0 text-green-800" />}
+                <span className="sr-only">: {finished ? 'Finished' : 'Still filling words'}</span>
+              </li>
+            )
+          })}
+        </ul>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="jam-eyebrow mb-1" data-testid="active-story-theme">{theme.name}</p>
+            <h1 className="jam-display">Fill the blanks.</h1>
+          </div>
+          <p className="flex items-center gap-1.5 rounded-lg bg-card px-2.5 py-1.5 font-mono text-2xl font-bold tabular-nums" data-testid="countdown">
+            <Clock3 size={18} aria-hidden /> {mm}:{ss}
+          </p>
+        </div>
+        <p className="mt-3 text-sm font-semibold text-muted-foreground" data-testid="progress">{game.filledCount} of {game.totalBlanks} blanks filled</p>
+        <progress className="mt-1 h-2 w-full accent-primary" value={game.filledCount} max={game.totalBlanks || 1} aria-label="Blanks filled" />
+        {expired && <p className="mt-1 text-sm font-semibold">Time is up! Finishing the story...</p>}
       </header>
 
       {status === 'loading' && <p className="text-center text-muted-foreground">Loading your blanks...</p>}
@@ -108,9 +115,9 @@ function BlankCard({ blankId, blank }: { blankId: string; blank: BlankView }) {
   }
 
   return (
-    <section className="space-y-3 rounded-lg border border-border bg-card p-5" data-testid="blank-card">
+    <section className="jam-panel space-y-3 p-4 sm:p-5" data-testid="blank-card">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="font-semibold">
+        <h2 className="text-base font-extrabold">
           Give me <span data-testid="blank-label">{blank.label}</span>
         </h2>
         {done && <Badge variant="success">{blank.source === 'player' ? 'Done' : 'Safety word'}</Badge>}
@@ -134,6 +141,7 @@ function BlankCard({ blankId, blank }: { blankId: string; blank: BlankView }) {
               aria-label={`Your word: ${blank.label}`}
               value={value}
               maxLength={WORD_MAX_LENGTH}
+              className="min-w-0"
               placeholder="Type something silly"
               onChange={(e) => setValue(e.target.value)}
             />

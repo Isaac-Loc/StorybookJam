@@ -30,7 +30,6 @@
  */
 
 import {
-  ART_STYLE,
   IMAGE_MAX_COST_USD,
   IMAGE_MODEL_ID,
   IMAGE_POLL_MS,
@@ -38,6 +37,7 @@ import {
   IMAGE_TIMEOUT_MS,
   pageMediaInFlight,
 } from '../../game'
+import { getStoryTheme } from '../../story-themes'
 import { reserveSpend } from './budget'
 import type { GameRecord, Loaded, PageRecord, Tools } from './helpers'
 import { listPages, loadDraft, loadGame } from './helpers'
@@ -107,7 +107,7 @@ async function renderImage(tools: Tools, prompt: string, timing: ImageTiming, si
   const started = await guarded(
     tools.integration<RunResponse>('fal/run-model', {
       model_id: IMAGE_MODEL_ID,
-      input: { prompt: `${ART_STYLE} ${prompt}`, image_size: IMAGE_SIZE, num_inference_steps: 4 },
+      input: { prompt, image_size: IMAGE_SIZE, num_inference_steps: 4 },
       maxCostUsd: IMAGE_MAX_COST_USD, // never the $2 default reservation
     }),
     callMs(),
@@ -188,13 +188,16 @@ export async function runImageJob(tools: Tools, gameId: string, opts: ImageJobOp
 
   try {
     const draft = await loadDraft(tools, gameId)
+    const { artStyle } = getStoryTheme(game.data.storyTheme)
     const todo = (await listPages(tools, gameId)).filter(inFlight)
     // All pages in parallel; each updates its own row as soon as it settles, so
     // the UI fills in live. allSettled: one page blowing up must not abandon the others.
     await Promise.allSettled(
-      todo.map((p) =>
-        runPage(tools, gameId, game.data.hostId, p, draft?.data.finalPrompts?.[p.data.idx], timing, opts.signal),
-      ),
+      todo.map((page) => {
+        const scene = draft?.data.finalPrompts?.[page.data.idx]
+        const prompt = scene ? `${artStyle} ${scene}` : undefined
+        return runPage(tools, gameId, game.data.hostId, page, prompt, timing, opts.signal)
+      }),
     )
   } catch {
     /* fall through: whatever is still in flight is failed below */

@@ -43,8 +43,8 @@ export default function GamePage() {
   // mounts Filling (and its tick loop). The server refuses expired rooms too.
   if (isExpired(game.data, now)) {
     return (
-      <div className="mx-auto max-w-md space-y-4 px-6 py-16 text-center" data-testid="room-expired">
-        <h1 className="text-2xl font-bold">This room has expired</h1>
+      <div className="jam-panel jam-container mt-10 max-w-md space-y-4 p-6 text-center sm:mt-16" data-testid="room-expired">
+        <h1 className="jam-display">This room has expired.</h1>
         <p className="text-muted-foreground">Rooms last 2 hours. Start a new one and play again!</p>
         <Link to="/home" className="inline-flex h-10 items-center rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary/90">
           Back home
@@ -59,7 +59,7 @@ export default function GamePage() {
   // generating / ready (and the legacy 'revealed') all show the story; the
   // illustrations fill in live while the phase is 'generating'.
   if (phase === 'generating' || phase === 'ready' || phase === 'revealed') {
-    return <Revealed gameId={game.recordId} title={game.data.title} phase={phase} />
+    return <Revealed gameId={game.recordId} title={game.data.title} phase={phase} storyTheme={game.data.storyTheme} />
   }
 
   return <p className="py-16 text-center text-muted-foreground">Something went wrong with this room ({phase}).</p>

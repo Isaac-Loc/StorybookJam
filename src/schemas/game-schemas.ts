@@ -12,6 +12,7 @@
 
 import type { CollectionSchema, RolePermissions } from 'deepspace/schema'
 import { GAME_PHASES, IMAGE_STATUSES, NARRATION_STATUSES } from '../game'
+import { DEFAULT_STORY_THEME, STORY_THEMES } from '../story-themes'
 
 const NONE: RolePermissions = { read: false, create: false, update: false, delete: false }
 
@@ -21,6 +22,12 @@ const num = (name: string, def = 0) =>
   ({ name, storage: 'number', interpretation: 'plain', default: def }) as const
 const json = (name: string, def: unknown) =>
   ({ name, storage: 'text', interpretation: { kind: 'json' }, default: def }) as const
+const storyThemeColumn = (name: string) => ({
+  name,
+  storage: 'text' as const,
+  interpretation: { kind: 'select' as const, options: STORY_THEMES.map(({ id }) => id) },
+  default: DEFAULT_STORY_THEME,
+})
 
 /** A room. Visible to its players only (host is the creator = owner). */
 export const gamesSchema: CollectionSchema = {
@@ -34,6 +41,8 @@ export const gamesSchema: CollectionSchema = {
       interpretation: { kind: 'select', options: [...GAME_PHASES] },
       default: 'lobby',
     },
+    storyThemeColumn('lobbyTheme'),
+    storyThemeColumn('storyTheme'),
     json('playerIds', []),
     json('playerNames', {}),
     num('phaseEndsAt'),

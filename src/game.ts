@@ -1,3 +1,5 @@
+import { STORY_THEMES } from './story-themes'
+
 /**
  * Shared game rules for StorybookJam.
  *
@@ -66,9 +68,8 @@ export const IMAGE_POLL_MS = 1000
 export const IMAGE_TIMEOUT_MS = 60_000
 /** Manual "Retry" presses allowed per page. */
 export const MAX_PAGE_RETRIES = 2
-/** One fixed art style for every page; the per-page prompt is appended. */
-export const ART_STYLE =
-  "Children's picture book illustration, soft watercolor and ink, warm friendly colors, simple shapes, no text, no letters, no words."
+/** Default style for Silly Surprise and rooms saved before themes existed. */
+export const ART_STYLE = STORY_THEMES[0].artStyle
 
 export const PAGE_COUNT = 4
 /** At most 600 characters across four separately narrated pages. */

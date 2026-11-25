@@ -6,7 +6,7 @@
  * from `params` is never trusted on its own:
  *   - createGame / joinGame  : any signed-in user (the caller only ever adds
  *                              THEMSELVES to a room).
- *   - startGame              : caller must be the game's hostId.
+ *   - setStoryTheme/startGame: caller must be the game's hostId.
  *   - submitBlank/useSafety  : caller must equal the blank's assignedTo.
  *   - tick                   : caller must have a membership row in the game.
  * submitBlank/useSafety also require a CURRENT membership, so a player who was
@@ -32,6 +32,8 @@ import {
   isValidCode,
   normalizeCode,
 } from '../../game'
+import { DEFAULT_STORY_THEME, getStoryTheme, isStoryTheme } from '../../story-themes'
+import type { StoryThemeId } from '../../story-themes'
 import type {
   BlankRecord,
   DraftRecord,
@@ -118,6 +120,8 @@ export const createGame: GameAction = async ({ userId, params, tools }) => {
       code,
       hostId: userId,
       phase: 'lobby',
+      lobbyTheme: DEFAULT_STORY_THEME,
+      storyTheme: DEFAULT_STORY_THEME,
       playerIds: [userId],
       playerNames: { [userId]: name },
       phaseEndsAt: 0,
@@ -211,6 +215,29 @@ export const joinGame: GameAction = async ({ userId, params, tools }) => {
 /* startGame                                                           */
 /* ------------------------------------------------------------------ */
 
+export const setStoryTheme: GameAction = async ({ userId, params, tools }) => {
+  const game = await loadGame(tools, str(params.gameId))
+  if (!game) return fail('Game not found.')
+  if (game.data.hostId !== userId) return fail('Only the host can pick the story theme.')
+  if (isExpired(game.data, Date.now())) return fail(EXPIRED_MESSAGE)
+  if (game.data.phase !== 'lobby') return fail('The game has already started.')
+  if (!isStoryTheme(params.theme)) return fail('Choose an available story theme.')
+
+  const drafts = await tools.query<DraftRecord>('storyDrafts', { where: { gameId: game.id }, limit: 1 })
+  if (!drafts.success) return fail('Could not update the story theme. Please try again.')
+  const claim = drafts.data.records[0]
+  if (claim && !isStaleClaim({
+    phase: game.data.phase,
+    blankCount: (await listBlanks(tools, game.id)).length,
+    claimAgeMs: Date.now() - Date.parse(claim.createdAt),
+  })) return fail('The game is already starting.')
+
+  // Edit the lobby preview only. If a start takes the claim during the
+  // update, it still writes its own locked theme with the phase transition.
+  const updated = await tools.update<GameRecord>('games', game.id, { lobbyTheme: params.theme })
+  return updated.success ? ok({ theme: params.theme }) : fail(updated.error)
+}
+
 /** Runs a cleanup step, swallowing any failure or thrown error. */
 async function bestEffort(step: () => Promise<unknown>): Promise<void> {
   try {
@@ -233,8 +260,9 @@ async function bestEffort(step: () => Promise<unknown>): Promise<void> {
 async function claimStart(
   tools: Tools,
   gameId: string,
+  theme: StoryThemeId,
 ): Promise<{ ok: true; draftId: string } | { ok: false; error: string }> {
-  const f = fixedStory() // placeholder content: startGame overwrites it with the real draft
+  const f = fixedStory(theme) // placeholder content: startGame overwrites it with the real draft
   const draft = { gameId, title: f.title, pages: f.pages, labels: f.labels, safety: f.safety, imagePrompts: f.imagePrompts, finalPrompts: [], source: f.source }
   const first = await tools.create<DraftRecord>('storyDrafts', draft)
   if (first.success) return { ok: true, draftId: first.data.recordId }
@@ -267,8 +295,10 @@ export const startGame: GameAction = async ({ userId, params, tools, env }) => {
   if (isExpired(game.data, Date.now())) return fail(EXPIRED_MESSAGE)
   if (game.data.hostId !== userId) return fail('Only the host can start the game.')
   if (game.data.phase !== 'lobby') return fail('The game has already started.')
+  if (params.theme !== undefined && !isStoryTheme(params.theme)) return fail('Choose an available story theme.')
+  const theme = params.theme ?? getStoryTheme(game.data.lobbyTheme).id
 
-  const claim = await claimStart(tools, game.id)
+  const claim = await claimStart(tools, game.id, theme)
   if (!claim.ok) return fail(claim.error)
 
   // Blanks THIS run created, so a failure removes only its own (never a concurrent start's).
@@ -285,7 +315,7 @@ export const startGame: GameAction = async ({ userId, params, tools, env }) => {
     // one). It runs BEFORE any blank exists and the 75 s timer only starts in
     // the final update below, so a slow model call never eats player time.
     // The draft (templates, safety words, image prompts) stays server-side.
-    const story = await draftStory(tools, game.id, game.data.hostId, generationEnabled(env))
+    const story = await draftStory(tools, game.id, game.data.hostId, generationEnabled(env), theme)
     // The model call can be slow: if our claim was meanwhile judged stale and
     // taken over by another start, our draft is gone and we must stand down
     // without touching anything that start created.
@@ -324,6 +354,7 @@ export const startGame: GameAction = async ({ userId, params, tools, env }) => {
     for (const m of members) playerNames[m.data.userId] = m.data.name
     const go = await tools.update<GameRecord>('games', game.id, {
       phase: 'filling',
+      storyTheme: theme,
       phaseEndsAt: Date.now() + FILL_SECONDS * 1000,
       totalBlanks: BLANK_COUNT,
       filledCount: 0,

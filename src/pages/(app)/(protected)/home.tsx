@@ -6,7 +6,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from 'deepspace'
+import { ArrowRight, Plus, Ticket } from 'lucide-react'
 import { Button, Input, Label, useToast } from '@/components/ui'
+import { ThemeArtwork } from '@/components/game/ThemeArtwork'
 import { callAction } from '@/lib/callAction'
 import { CODE_LENGTH, NAME_MAX_LENGTH, cleanName, normalizeCode } from '../../../game'
 
@@ -39,68 +41,59 @@ export default function HomePage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-full max-w-md flex-col justify-center gap-8 px-6 py-12 text-foreground">
-      <header className="text-center">
-        <h1 className="text-3xl font-bold tracking-tight">StorybookJam</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Everyone fills in a few secret blanks. Then the whole silly story is revealed.
-        </p>
+    <div className="jam-container grid max-w-5xl items-start gap-6 py-8 sm:py-14 lg:grid-cols-[.8fr_1fr] lg:gap-9">
+      <header className="jam-stage overflow-hidden" data-world="silly">
+        <ThemeArtwork theme="silly" />
+        <div className="p-5 sm:p-7">
+          <h1 className="jam-display">Let’s make a story.</h1>
+          <p className="mt-3 text-base text-muted-foreground">
+            Host a room for friends, play solo, or join a room with a code.
+          </p>
+        </div>
       </header>
 
-      <section className="space-y-2">
-        <Label htmlFor="display-name">Your name</Label>
-        <Input
-          id="display-name"
-          data-testid="display-name"
-          value={name}
-          maxLength={NAME_MAX_LENGTH}
-          placeholder="What should we call you?"
-          onChange={(e) => setTyped(e.target.value)}
-        />
-      </section>
-
-      <section className="space-y-3 rounded-lg border border-border bg-card p-5">
-        <h2 className="font-semibold">Host a room</h2>
-        <Button
-          className="w-full"
-          data-testid="create-room"
-          loading={busy === 'create'}
-          disabled={busy !== null}
-          onClick={() => run('create')}
-        >
-          Create a room
-        </Button>
-      </section>
-
-      <section className="space-y-3 rounded-lg border border-border bg-card p-5">
-        <h2 className="font-semibold">Join with a code</h2>
-        <form
-          className="flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault()
-            void run('join')
-          }}
-        >
+      <div className="jam-panel grid gap-5 p-5 sm:p-7">
+        <section className="space-y-2">
+          <Label htmlFor="display-name">Your name</Label>
           <Input
-            data-testid="join-code"
-            aria-label="Room code"
-            value={code}
-            maxLength={CODE_LENGTH + 4}
-            placeholder="ABCDE"
-            className="font-mono uppercase tracking-widest"
-            onChange={(e) => setCode(normalizeCode(e.target.value))}
+            id="display-name"
+            data-testid="display-name"
+            value={name}
+            maxLength={NAME_MAX_LENGTH}
+            placeholder="What should we call you?"
+            onChange={(e) => setTyped(e.target.value)}
           />
-          <Button
-            type="submit"
-            variant="secondary"
-            data-testid="join-room"
-            loading={busy === 'join'}
-            disabled={busy !== null || code.length !== CODE_LENGTH}
-          >
-            Join
+        </section>
+
+        <section className="grid gap-3 rounded-xl bg-secondary p-4">
+          <h2 className="flex items-center gap-2 text-base font-extrabold"><Plus size={19} aria-hidden /> Host a room</h2>
+          <Button data-testid="create-room" loading={busy === 'create'} disabled={busy !== null} onClick={() => run('create')}>
+            Create a room <ArrowRight aria-hidden />
           </Button>
-        </form>
-      </section>
+        </section>
+
+        <section className="grid gap-3 rounded-xl border border-border p-4">
+          <h2 className="flex items-center gap-2 text-base font-extrabold"><Ticket size={19} aria-hidden /> Join with a code</h2>
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              void run('join')
+            }}
+          >
+            <Input
+              data-testid="join-code"
+              aria-label="Room code"
+              value={code}
+              maxLength={CODE_LENGTH + 4}
+              placeholder="ABCDE"
+              className="min-w-0 font-mono uppercase tracking-widest"
+              onChange={(e) => setCode(normalizeCode(e.target.value))}
+            />
+            <Button type="submit" variant="secondary" data-testid="join-room" loading={busy === 'join'} disabled={busy !== null || code.length !== CODE_LENGTH}>Join</Button>
+          </form>
+        </section>
+      </div>
     </div>
   )
 }

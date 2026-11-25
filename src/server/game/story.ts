@@ -19,6 +19,9 @@ import {
   cleanWord,
   fillTemplate,
 } from '../../game'
+import type { BlankSpec } from '../../game'
+import { DEFAULT_STORY_THEME, getStoryTheme } from '../../story-themes'
+import type { StoryThemeId } from '../../story-themes'
 
 export const LABEL_MAX = 40
 export const TITLE_MAX = 60
@@ -39,14 +42,15 @@ export type StoryDraft = {
 /** One polished page: final text and the moderated image prompt. */
 export type PolishedPage = { text: string; imagePrompt: string }
 
-/** The hand-written story, used whenever generation is off, over budget, or fails. */
-export function fixedStory(): StoryDraft {
+/** A hand-written story for each theme, used when generation is unavailable. */
+export function fixedStory(theme: StoryThemeId = DEFAULT_STORY_THEME): StoryDraft {
+  const story = FIXED_STORIES[theme]
   return {
-    title: STORY_TITLE,
-    labels: BLANK_SPECS.map((b) => b.label),
-    safety: BLANK_SPECS.map((b) => [...b.safety]),
-    pages: [...STORY_PAGES],
-    imagePrompts: [...FIXED_IMAGE_PROMPTS],
+    title: story.title,
+    labels: story.blanks.map((b) => b.label),
+    safety: story.blanks.map((b) => [...b.safety]),
+    pages: [...story.pages],
+    imagePrompts: [...story.imagePrompts],
     source: 'fixed',
   }
 }
@@ -58,6 +62,61 @@ const FIXED_IMAGE_PROMPTS = [
   'Gerald pushes against a giant {4} that keeps growing bigger, looking worried, with {3} nearby.',
   'Gerald hands a {3} to a giant {4} that floats happily into the sky, waving goodbye, sunset.',
 ]
+
+const FIXED_STORIES: Record<StoryThemeId, {
+  title: string
+  blanks: readonly BlankSpec[]
+  pages: readonly string[]
+  imagePrompts: readonly string[]
+}> = {
+  silly: { title: STORY_TITLE, blanks: BLANK_SPECS, pages: STORY_PAGES, imagePrompts: FIXED_IMAGE_PROMPTS },
+  space: {
+    title: 'Pip and the Crater Caper',
+    blanks: [
+      { label: 'a small animal', safety: ['hamster', 'mouse', 'newt', 'frog', 'gecko'] },
+      { label: 'a made-up planet name', safety: ['Wobbulon', 'Planet Toast', 'Fizz', 'Moon Pop', 'Noodle Nine'] },
+      { label: 'a snack for a long trip', safety: ['popcorn', 'toast', 'crackers', 'pretzels', 'grapes'] },
+      { label: 'a strange alien creature', safety: ['moon jelly', 'crater crab', 'space slug', 'star toad', 'orbit otter'] },
+      { label: 'a silly space sound', safety: ['bloop', 'zip', 'boing', 'bzzzt', 'wheee'] },
+      { label: 'a funny thing to find in a rocket', safety: ['spoon', 'rubber duck', 'plunger', 'balloon', 'sock'] },
+    ],
+    pages: [
+      'Captain Pip, a {0}, landed on {1} with a crate of {2}.',
+      'A {3} zoomed out of a crater and yelled "{4}!"',
+      'Pip used a {5} to steer it away from the ship.',
+      'The {3} traded a hug for {2}, and Pip blasted off.',
+    ],
+    imagePrompts: [
+      'Captain Pip, a small {0} in a red space suit with a bubble helmet, lands a rounded rocket on {1} beside a crate of {2}.',
+      'Captain Pip in a red space suit with a bubble helmet spots a goofy {3} hopping out of a moon crater.',
+      'Captain Pip in a red space suit with a bubble helmet waves a {5} to steer the friendly {3} away from a rounded rocket.',
+      'Captain Pip in a red space suit with a bubble helmet takes off in a rounded rocket while the {3} eats {2}.',
+    ],
+  },
+  quest: {
+    title: 'Fern and the Crumb-Sized Treasure',
+    blanks: [
+      { label: 'a very tiny animal', safety: ['ant', 'mite', 'snail', 'moth', 'beetle'] },
+      { label: 'a snack to pack for a quest', safety: ['crumbs', 'cheese', 'berries', 'raisins', 'seeds'] },
+      { label: 'a place in a backyard', safety: ['the lawn', 'a flower bed', 'the patio', 'a planter', 'the compost pile'] },
+      { label: 'a backyard obstacle', safety: ['puddle', 'sprinkler', 'watering can', 'wind chime', 'garden hose'] },
+      { label: 'a surprisingly loud sound', safety: ['bong', 'crash', 'splosh', 'thwack', 'clank'] },
+      { label: 'an object a tiny hero could use', safety: ['twist tie', 'twig', 'feather', 'shoelace', 'paper straw'] },
+    ],
+    pages: [
+      'Fern, a tiny {0}, packed {1} and set off across {2}.',
+      'A {3} blocked the trail and made a loud "{4}!"',
+      'Fern used a {5} to build a bridge over it.',
+      'Across the bridge, Fern shared {1} and found a treasure the size of a crumb.',
+    ],
+    imagePrompts: [
+      'Fern, a tiny {0} with a yellow scarf, packs {1} at the edge of {2}, seen from ground level.',
+      'Fern, a little backyard hero with a yellow scarf, stands before an enormous {3} among giant blades of grass.',
+      'Fern, a little backyard hero with a yellow scarf, uses a {5} to make a bridge past a big {3}.',
+      'Fern, a little backyard hero with a yellow scarf, shares {1} beside a tiny glinting treasure and an enormous flower.',
+    ],
+  },
+}
 
 /* ------------------------------------------------------------------ */
 /* Parsing and validation                                              */
@@ -179,9 +238,12 @@ export function validatePolished(input: unknown): { pages: PolishedPage[] } | nu
 export const STORY_SYSTEM = `You write short, silly, absurd, kid-friendly picture-book stories with fill-in-the-blank words.
 Reply with ONE JSON object only. No markdown, no code fences, no commentary.`
 
-export function storyUserPrompt(): string {
+export function storyUserPrompt(theme: StoryThemeId = DEFAULT_STORY_THEME): string {
+  const { name, setting } = getStoryTheme(theme)
   return `Write a fresh picture-book story as JSON with exactly this shape:
 {"title": string, "blanks": [6 x {"label": string, "safety": [5 strings]}], "pages": [4 x {"text": string, "imagePrompt": string}]}
+
+Story theme: ${name}. ${setting}
 
 Rules:
 - "blanks" are the words players will fill in. label is a short playful request, at most 40 characters, like "an animal" or "something you would find in a kitchen". Use VARIED word types (animal, adjective, place, food, object, sound, ...).

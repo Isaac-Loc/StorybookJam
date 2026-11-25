@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { ROOM_TTL_MS } from '../../game'
-import { createGame, joinGame, startGame, submitBlank, tick, useSafetyWord } from './actions'
+import { createGame, joinGame, setStoryTheme, startGame, submitBlank, tick, useSafetyWord } from './actions'
 import { createFakeTools } from './fakeTools'
 import type { FakeTools } from './fakeTools'
 import type { GameAction } from './helpers'
@@ -36,10 +36,11 @@ async function expiredRoom() {
 }
 
 describe('expired rooms', () => {
-  it('are refused by joinGame, startGame, submitBlank, useSafetyWord and tick', async () => {
+  it('are refused by joinGame, setStoryTheme, startGame, submitBlank, useSafetyWord and tick', async () => {
     const { tools, gameId, blankId } = await expiredRoom()
     const results = await Promise.all([
       run(joinGame, 'newbie', tools, { code: 'ABCDE', name: 'New' }),
+      run(setStoryTheme, 'host', tools, { gameId, theme: 'space' }),
       run(startGame, 'host', tools, { gameId }),
       run(submitBlank, 'host', tools, { blankId, value: 'cat' }),
       run(useSafetyWord, 'host', tools, { blankId }),

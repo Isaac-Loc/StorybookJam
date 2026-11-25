@@ -71,30 +71,29 @@ export function JoinRoom({ code }: { code: string }) {
   }
 
   return (
-    <div className="mx-auto max-w-md space-y-5 px-6 py-16">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold">Join this room</h1>
-        <p className="mt-1 font-mono text-lg tracking-widest text-muted-foreground" data-testid="join-room-code">
-          {code}
-        </p>
+    <div className="jam-container max-w-lg py-10 sm:py-16">
+      <div className="jam-panel space-y-5 p-5 sm:p-7">
+        <div>
+          <h1 className="jam-display">Join this room.</h1>
+          <p className="jam-ticket mt-3 inline-block px-3 py-1.5 font-mono text-lg font-bold tracking-widest" data-testid="join-room-code">
+            {code}
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="join-name">Your name</Label>
+          <Input
+            id="join-name"
+            data-testid="join-name"
+            value={name}
+            maxLength={NAME_MAX_LENGTH}
+            onChange={(e) => setTyped(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && void join()}
+          />
+        </div>
+        <Button className="w-full" data-testid="join-submit" loading={busy} onClick={join}>
+          Join this room
+        </Button>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="join-name">Your name</Label>
-        <Input
-          id="join-name"
-          data-testid="join-name"
-          value={name}
-          maxLength={NAME_MAX_LENGTH}
-          onChange={(e) => setTyped(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && void join()}
-        />
-      </div>
-      <Button className="w-full" data-testid="join-submit" loading={busy} onClick={join}>
-        Join this room
-      </Button>
-      <p className="text-center text-xs text-muted-foreground">
-        If nothing happens, the room may not exist, may be full, or may have already started.
-      </p>
     </div>
   )
 }

@@ -27,7 +27,7 @@ declare const __DEEPSPACE_SITE_ORIGIN__: string | undefined
 export const seo = {
   title: 'StorybookJam | Silly multiplayer story game',
   description:
-    'StorybookJam is a multiplayer storybook game: friends secretly fill in blanks, then reveal an absurd story together.',
+    'Pick a world, fill secret blanks with friends, and hear your words turn into an illustrated story in StorybookJam.',
   /** Public origin for canonical URLs, og:url, and the sitemap — no trailing
    *  slash. Replace with the custom domain once one is attached, e.g.
    *  'https://www.example.com'. */

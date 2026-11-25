@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { ART_STYLE, GENERATION_CAP_CREDITS, IMAGE_MAX_COST_USD, MAX_PAGE_RETRIES } from '../../game'
+import { getStoryTheme } from '../../story-themes'
 import { retryPage, tick } from './actions'
 import { createFakeTools } from './fakeTools'
 import type { FakeTools, IntegrationCall } from './fakeTools'
@@ -77,6 +78,18 @@ describe('runImageJob', () => {
       expect(String(input.prompt)).toContain(ART_STYLE)
       expect(String(input.prompt)).toMatch(/p[0-3]$/)
     }
+  })
+
+  it('uses the locked theme for art even if the lobby preview is different', async () => {
+    const t = createFakeTools('host')
+    const gameId = await game(t, ['pending'])
+    await t.update('games', gameId, { storyTheme: 'quest', lobbyTheme: 'space' })
+    scriptFal(t)
+    await runImageJob(t, gameId, run())
+    expect(falCalls(t, 'fal/run-model')[0]?.body).toMatchObject({
+      maxCostUsd: IMAGE_MAX_COST_USD,
+      input: { prompt: `${getStoryTheme('quest').artStyle} p0` },
+    })
   })
 
   it('retries a failed call once automatically, then succeeds', async () => {

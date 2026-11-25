@@ -20,9 +20,12 @@
  */
 
 import { Link } from 'react-router-dom'
+import { ArrowDown, ArrowRight, BookOpen, Headphones, PencilLine, Users } from 'lucide-react'
+import { Brand } from '../components/Brand'
+import { ThemeArtwork } from '../components/game/ThemeArtwork'
 import { Seo } from '../components/Seo'
-import { APP_NAME } from '../constants'
 import { seo } from '../seo'
+import { STORY_THEMES } from '../story-themes'
 
 /** Sample book: the text was written by hand for this demo; the pictures were
  *  generated with the same image model, size and style the app uses. */
@@ -50,61 +53,92 @@ export default function Landing() {
   return (
     <>
       <Seo {...seo} path="/" />
-      <div data-testid="static-landing" className="flex min-h-screen flex-col items-center px-6 pb-24 text-center">
-        <section className="flex flex-col items-center py-24">
-          <p className="mb-3 text-sm uppercase tracking-widest text-muted-foreground">{APP_NAME}</p>
-          <h1 className="mb-4 max-w-2xl text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-            Build a silly story together, one secret blank at a time
-          </h1>
-          <p className="mb-8 max-w-md text-muted-foreground">
-            Start a room and share the code with friends. Everyone gets a few secret blanks to fill
-            in ("an animal", "a food", "a sound") without ever seeing the story. When the last blank
-            is filled, the whole absurd tale is revealed and illustrated.
-          </p>
-          <Link
-            to="/home"
-            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
-          >
-            Play now
-          </Link>
-        </section>
-
-        <section aria-labelledby="sample-heading" className="w-full max-w-3xl">
-          <h2 id="sample-heading" className="mb-2 text-2xl font-semibold tracking-tight text-foreground">
-            A sample book: {SAMPLE_TITLE}
-          </h2>
-          <p className="mx-auto mb-8 max-w-xl text-sm text-muted-foreground">
-            Sample only. The words were written by hand for this page; the pictures come from the same
-            image model and style the game uses. In a real room, Claude writes a fresh story every time
-            and your friends' words are in it.
-          </p>
-          <ol className="flex flex-col gap-8 text-left">
-            {SAMPLE_PAGES.map((page, i) => (
-              <li key={i} className="overflow-hidden rounded-xl border border-border bg-card">
-                <img
-                  src={`/sample/page-${i + 1}.jpg`}
-                  alt={page.alt}
-                  width={768}
-                  height={576}
-                  loading={i === 0 ? 'eager' : 'lazy'}
-                  className="aspect-[4/3] w-full object-cover"
-                />
-                <p className="px-5 py-4 text-base leading-relaxed text-foreground">
-                  <span className="mr-2 text-sm text-muted-foreground">Page {i + 1}</span>
-                  {page.text}
-                </p>
-              </li>
-            ))}
-          </ol>
-          <div className="mt-10">
-            <Link
-              to="/home"
-              className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
-            >
-              Make your own
-            </Link>
+      <div data-testid="static-landing" className="jam-landing">
+        <header className="jam-site-header">
+          <div className="jam-container jam-header-inner">
+            <Brand />
+            <nav aria-label="Explore StorybookJam" className="jam-public-nav">
+              <a href="#worlds">Story themes</a>
+              <a href="#how-to-play">How to play</a>
+            </nav>
+            <Link to="/home" className="jam-button jam-button-small jam-button-outline">Play now <ArrowRight size={16} aria-hidden /></Link>
           </div>
-        </section>
+        </header>
+
+        <main>
+          <section aria-labelledby="hero-heading" className="jam-container jam-hero">
+            <div>
+              <p className="jam-eyebrow"><span className="jam-dot" /> The multiplayer story game</p>
+              <h1 id="hero-heading" className="jam-hero-title">Make a story.<br /><em>Make it weird.</em></h1>
+              <p className="jam-hero-copy">Get your friends together, fill in secret blanks, and hear your words turn into an illustrated story.</p>
+              <div className="jam-hero-actions">
+                <Link to="/home" className="jam-button">Start playing <ArrowRight size={19} aria-hidden /></Link>
+                <a href="#sample" className="jam-text-link">See a sample <ArrowDown size={16} aria-hidden /></a>
+              </div>
+              <p className="jam-hero-note"><Users size={17} aria-hidden /> Play solo or with up to six players</p>
+            </div>
+
+            <div className="jam-hero-art" aria-hidden>
+              <div className="jam-hero-world jam-hero-space"><ThemeArtwork theme="space" /></div>
+              <div className="jam-hero-world jam-hero-quest"><ThemeArtwork theme="quest" /></div>
+              <div className="jam-hero-book">
+                <img src="/sample/page-1.jpg" alt="" width={768} height={576} fetchPriority="high" />
+              </div>
+              <span className="jam-art-tag"><PencilLine size={18} /> A ridiculous <strong>________</strong></span>
+            </div>
+          </section>
+
+          <section id="worlds" className="jam-world-section">
+            <div className="jam-container">
+              <div className="jam-section-heading">
+                <h2>Pick a story world.</h2>
+                <p>The host chooses the theme. Everyone helps write what happens next.</p>
+              </div>
+              <div className="jam-world-grid">
+                {STORY_THEMES.map((theme) => (
+                  <article key={theme.id} className="jam-world-card" data-world={theme.id}>
+                    <ThemeArtwork theme={theme.id} />
+                    <div><h3>{theme.name}</h3><p>{theme.description}</p></div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section id="how-to-play" className="jam-container jam-how">
+            <div className="jam-section-heading">
+              <h2>How to play.</h2>
+            </div>
+            <ol className="jam-step-grid">
+              <li><Users aria-hidden /><h3>Get a room</h3><p>Pick a world and send friends an invite link or room code.</p></li>
+              <li><PencilLine aria-hidden /><h3>Fill your blanks</h3><p>See your own prompts and add words before time runs out.</p></li>
+              <li><Headphones aria-hidden /><h3>Hear the reveal</h3><p>Follow the illustrations as your finished book is read aloud.</p></li>
+            </ol>
+          </section>
+
+          <section id="sample" className="jam-sample-section" aria-labelledby="sample-heading">
+            <div className="jam-container">
+              <div className="jam-section-heading">
+                <div><p className="jam-eyebrow"><BookOpen size={18} aria-hidden /> Sample book</p><h2 id="sample-heading">{SAMPLE_TITLE}</h2></div>
+                <p>A small taste of Silly Surprise.</p>
+              </div>
+              <ol className="jam-sample-grid">
+                {SAMPLE_PAGES.map((page, i) => (
+                  <li key={page.alt}>
+                    <img src={`/sample/page-${i + 1}.jpg`} alt={page.alt} width={768} height={576} loading="lazy" />
+                    <div><p className="jam-eyebrow">Page {i + 1}</p><p>{page.text}</p></div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </section>
+        </main>
+        <footer className="jam-footer">
+          <div className="jam-container jam-header-inner">
+            <Brand />
+            <Link to="/home" className="jam-button jam-button-small">Make your own <ArrowRight size={17} aria-hidden /></Link>
+          </div>
+        </footer>
       </div>
     </>
   )
