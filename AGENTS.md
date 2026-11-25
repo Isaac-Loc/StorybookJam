@@ -6,6 +6,29 @@ page as Markdown by appending `.md`. The installed package types and CLI
 shell, and browser tools; no skill, plugin, connector, or session restart is
 required. Installing the optional skill is a separate explicit choice.
 
+## StorybookJam: read this first
+
+This repo is StorybookJam, a multiplayer Mad-Libs picture book. Before changing
+anything, read [docs/HANDOFF.md](./docs/HANDOFF.md): the project spec, decisions
+already made, architecture, costs, gotchas, testing, current state and next
+steps. Non-negotiables:
+
+- Do not commit, push or deploy, and do not make paid calls (anthropic, fal,
+  anything), unless the developer asks. Always set `maxCostUsd` on
+  `fal/run-model`.
+- The repo is public: never commit secrets, `.dev.vars`, session files, test
+  passwords, or personal emails and IDs.
+- Hidden game data is hidden by the SERVER (record permissions). Action tools
+  bypass RBAC, so authorize the caller inside every action. The app owner is
+  automatically `admin` and also plays: check every permission rule for that.
+- Never send raw player text to the image model. Keep the browser integration
+  proxy deny-by-default.
+- Keep the docs current: any change to behavior, limits, schemas, actions,
+  integrations, costs or workflow must update docs/HANDOFF.md in the same
+  commit (see its section 11).
+- Before a commit run `npm run type-check && npm run lint && npm run test:unit
+  && npm run build`. On Windows, commit with `git commit -F <message-file>`.
+
 ## About this project
 
 This is a **DeepSpace** app — a real-time collaborative app built on the
