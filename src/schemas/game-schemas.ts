@@ -69,7 +69,13 @@ export const membershipsSchema: CollectionSchema = {
 /**
  * One secret slot of the story. Only the assigned player may read it: the
  * Durable Object filters rows BEFORE broadcast, so other players' labels and
- * words never reach their browsers. Admins are deliberately locked out too.
+ * words never reach their browsers.
+ *
+ * Admins get 'own' too, NOT false. The SDK makes the app owner an admin
+ * automatically, and the owner plays rounds like anyone else: with
+ * `read: false` the owner's own blanks were invisible to them ("you have no
+ * blanks this round"). 'own' keeps an admin out of other players' blanks while
+ * letting them see the ones dealt to them.
  */
 export const blanksSchema: CollectionSchema = {
   name: 'blanks',
@@ -88,7 +94,7 @@ export const blanksSchema: CollectionSchema = {
     '*': NONE,
     viewer: NONE,
     member: { read: 'own', create: false, update: false, delete: false },
-    admin: { read: false, create: false, update: false, delete: false },
+    admin: { read: 'own', create: false, update: false, delete: false },
   },
 }
 
