@@ -277,7 +277,7 @@ function Illustration({ gameId, page, theme }: { gameId: string; page: PageView;
     case 'skipped':
       return (
         <div className="jam-reader-art jam-story-placeholder" data-testid="illustration-skipped">
-          <ThemeArtwork theme={theme} />
+          <ThemeArtwork theme={theme} placeholder />
           <span className="absolute right-2 bottom-2 rounded bg-card px-2 py-1 text-xs font-semibold text-muted-foreground">Text-only page</span>
         </div>
       )

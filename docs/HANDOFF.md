@@ -14,12 +14,11 @@ change behavior, limits or decisions, update the relevant section.
 
 ## 0. Resume here (state snapshot, 2026-11-24 ET)
 
-The last verified live release and GitHub `dev` head were at `4414442`, with
-six-page rounds and bundled sample narration. This checkout lengthens the
-pages, moves the tone toward deadpan comedy for friend groups, and gives
-the finished story a viewport-sized reader. Verify deployment by comparing
-`npx deepspace releases` with `git rev-parse --short HEAD`. Sample narration
-and its one-time charge are verified. The longer rounds are unverified live.
+The previously verified live release and GitHub `dev` head were at `b5a2b5e`,
+with longer stories, a deadpan tone, and a larger reader. This checkout
+adds original landing art, theme covers, and the six-page sample
+“The Fax Machine Knows.” Verify deployment by comparing `npx deepspace releases`
+with `git rev-parse --short HEAD`. The longer rounds are unverified live.
 
 First five minutes in a new session (read-only, free):
 ```bash
@@ -33,11 +32,9 @@ at `~/.deepspace/session` (it acts as the developer; never print or copy it).
 Ask the developer to run it or to approve it rather than working around it.
 
 Next actions, in order (see section 3 for the table):
-1. DONE: landing sample book. `public/sample/page-1..4.jpg` plus a static
-   section in `src/pages/index.tsx` (hand-written story "Pip and the Giant
-   Spatula", pictures made with the same fal model, size and style as the app;
-   the landing page itself never calls a model). The four images cost about 5.6
-   credits, and one page was regenerated (about 1.4 more).
+1. DONE: landing sample book. `src/sample-story.ts` holds the six static
+   pages of “The Fax Machine Knows.” The illustrations and audio are bundled
+   files. Opening the landing page and listening costs no credits.
 2. DONE: `README.md` rewritten with the real features, caps and kill switch.
 3. DONE (draft): `docs/SUBMISSION_NOTE.md`. The developer must read it, edit it
    into their own voice, resolve the `[CONFIRM]` lines, and paste it into the
@@ -91,7 +88,7 @@ prompts. Preserve that property in every change.
 | Reveal | Automatic when the last blank is filled. The slideshow tries autoplay and offers manual play and page controls |
 | Tone / art | Deadpan absurdity and genre parody for friend groups, with the existing all-ages safety pass. The host chooses Silly Surprise (editorial watercolor), Space Trouble (retro sci-fi pulp), or Tiny Quest (cut-paper adventure). The theme guides the story, blank prompts, illustration style, and reader accents. |
 | Length | New rounds have 6 pages, at most 200 characters per page and 1,200 across the page bodies. The prompt asks for connected scenes and an ending that pays off the setup. Existing 4-page rounds can finish with their original 150-character page limit. |
-| Sharing | No public player books. The landing page has a four-page sample book (`public/sample/`) and a bundled recording (`src/assets/sample-narration.mp3`). Playing it makes no integration calls. |
+| Sharing | No public player books. The landing page has a six-page demo (`src/sample-story.ts`, `public/story-art/`) and a bundled, locally synthesized recording. Playing it makes no integration calls. |
 | Room lifetime | 2 hours, then deleted (cron + opportunistic cleanup) |
 | Spend | Generation is developer-billed. App-side cap 400 estimated credits globally, 120 per host; 100 credits kept for development testing |
 | Integrations | `anthropic`, `fal`, and `elevenlabs`. No video (fal compute-priced runs reserve $2) |
@@ -111,9 +108,10 @@ Done and live (release history from `npx deepspace releases`):
 | later | 7b36c0e | Narrated slideshow and player completion checkmarks |
 | later | b2f8e77 | Redesigned frontend and host-selected story themes |
 | later | 4414442 | Six-page stories and bundled sample narration |
+| later | b5a2b5e | Longer pages, deadpan tone, and larger finished-story reader |
 
-This checkout adds longer, more connected pages and the larger finished-book
-reader. Use `npx deepspace releases` to verify the currently live commit.
+This checkout adds the new landing and cover illustrations and replaces the
+public sample. Use `npx deepspace releases` to verify the currently live commit.
 
 Remaining, in priority order:
 1. The developer reviews `docs/SUBMISSION_NOTE.md` and resolves its `[CONFIRM]` lines.
@@ -227,9 +225,10 @@ credits. Narration adds an estimated maximum of 4 credits per 200-character
 page and 24 per six-page story. Each request contains just that page's body,
 with no title or separator. With the two story calls and first attempts at all
 illustrations and clips, the ledger reserves 41 credits for a six-page round.
-Retries may add image costs. A live longer round has not been measured. The sample's
-543-character combined recording cost 10.86 credits once. Serving the saved
-MP3 does not call ElevenLabs. The ledger
+Retries may add image costs. A live longer round has not been measured. The
+original Pip sample recording cost 10.86 credits. The replacement fax demo
+uses built-in image generation outside DeepSpace and offline speech synthesis
+for its narration, so it used no DeepSpace credits. The ledger
 estimates are `COST_ESTIMATE_CREDITS` in `src/game.ts`. The ledger is
 race-free: write the reservation row first, sum, delete your own row if over
 the cap. Real spend: `npx deepspace app usage --json`.
@@ -260,10 +259,31 @@ src/pages/(app)/(protected)/home.tsx, game/[code].tsx   client pages
 src/components/game/           Lobby, JoinRoom, Filling, Revealed
 tests/game.spec.ts             two-account Playwright spec
 tests/helpers/generation-off.mjs   turns generation off for e2e
-public/sample/page-1..4.jpg    landing-page sample illustrations (committed assets)
-src/assets/sample-narration.mp3  bundled landing-page sample recording
+public/story-art/               hero, three theme covers, and six sample illustrations
+src/sample-story.ts             static six-page landing sample text and image descriptions
+src/assets/fax-demo-narration.wav  bundled sample audio from offline speech synthesis
 docs/SUBMISSION_NOTE.md        draft of the portal writeup (developer edits it)
 ```
+
+### Landing illustrations
+
+The built-in image generator made the static art in `public/story-art/`.
+Prompts specified full-bleed, text-free scenes with an editorial look:
+
+- Hero: a sage-green haunted fax on a plum desk prints visions of a rocket,
+  a tiny adventurer, and an office corridor. Mustard light, aubergine shadows,
+  and vintage gouache and ink.
+- Silly Surprise: treat the fax as the senior manager at a municipal
+  conference table. Mauve walls, solemn chairs, editorial watercolor.
+- Space Trouble: a workhorse rocket stuck in traffic at an orbital toll
+  booth. Cobalt and mustard retro pulp art with halftone texture.
+- Tiny Quest: a tiny adventurer in a yellow scarf rafts across a backyard
+  puddle on a receipt. Oversized weeds and a key, layered moss-green paper.
+- Demo pages: repeat Mara's black bob, mustard turtleneck, charcoal blazer,
+  sage fax, and mauve municipal office in restrained watercolor and ink.
+  The six scenes show her reading a prediction, eyeing the mug, spilling
+  coffee, filing a request, getting the cabinets fixed, and leaving the mug
+  with the fax.
 
 ## 5. Hard-won platform lessons
 
@@ -454,3 +474,7 @@ file. So:
   for drier comedy and stronger continuity, and expanded the finished-book
   reader. Verified desktop and phone layouts, two-player navigation, and
   mocked narration. No paid live longer round was run.
+- 2026-11-24 (ET, evening): created ten static illustrations with built-in
+  image generation and replaced the sample with “The Fax Machine Knows.”
+  Verified all illustrations and locally synthesized audio in Chromium at
+  desktop and phone widths. The demo made no DeepSpace integration calls.

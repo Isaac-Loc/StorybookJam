@@ -22,33 +22,12 @@
 import { Link } from 'react-router-dom'
 import { ArrowDown, ArrowRight, BookOpen, Headphones, PencilLine, Users } from 'lucide-react'
 import { Brand } from '../components/Brand'
-import sampleNarrationUrl from '../assets/sample-narration.mp3?url'
+import sampleNarrationUrl from '../assets/fax-demo-narration.wav?url'
 import { ThemeArtwork } from '../components/game/ThemeArtwork'
 import { Seo } from '../components/Seo'
 import { seo } from '../seo'
 import { STORY_THEMES } from '../story-themes'
-
-/** Sample book: the text was written by hand for this demo; the pictures were
- *  generated with the same image model, size and style the app uses. */
-const SAMPLE_TITLE = 'Pip and the Giant Spatula'
-const SAMPLE_PAGES = [
-  {
-    text: 'In the town of Wobblebottom, there lived a very fluffy penguin named Pip, who loved pancakes more than anything in the whole world.',
-    alt: 'A fluffy penguin in a red scarf hugging a tall stack of pancakes in a colorful town',
-  },
-  {
-    text: 'One morning, Pip found a giant spatula standing in the middle of the road. Every time anyone came close, it went BONK.',
-    alt: 'A surprised penguin on a country road looking up at a giant silver spatula',
-  },
-  {
-    text: 'Pip tried to push it away, but it only grew bigger. “Only pancakes can stop this!” he shouted.',
-    alt: 'The penguin pushing a huge spatula while villagers watch from their windows',
-  },
-  {
-    text: 'So Pip flipped a pancake as big as a trampoline. The spatula scooped it up and floated into the sky going BONK, and Pip never complained about Mondays again. The end.',
-    alt: 'A giant spatula and a huge pancake floating in a pink sunset sky above a smiling penguin',
-  },
-] as const
+import { SAMPLE_PAGES, SAMPLE_TITLE } from '../sample-story'
 
 export default function Landing() {
   return (
@@ -79,14 +58,8 @@ export default function Landing() {
               <p className="jam-hero-note"><Users size={17} aria-hidden /> Play solo or with up to six players</p>
             </div>
 
-            <div className="jam-hero-art" aria-hidden>
-              <div className="jam-hero-world jam-hero-space"><ThemeArtwork theme="space" /></div>
-              <div className="jam-hero-world jam-hero-quest"><ThemeArtwork theme="quest" /></div>
-              <div className="jam-hero-world jam-hero-silly"><ThemeArtwork theme="silly" /></div>
-              <div className="jam-hero-prompt">
-                <p className="jam-eyebrow"><PencilLine size={16} aria-hidden /> A suspicious object</p>
-                <p className="jam-hero-answer">haunted fax machine</p>
-              </div>
+            <div className="jam-hero-art">
+              <img src="/story-art/hero.jpg" alt="A haunted fax machine unspools visions of a rocket, a tiny adventurer, and a lonely office." width={1200} height={900} fetchPriority="high" />
             </div>
           </section>
 
@@ -122,7 +95,7 @@ export default function Landing() {
             <div className="jam-container">
               <div className="jam-section-heading">
                 <div><p className="jam-eyebrow"><BookOpen size={18} aria-hidden /> Sample book</p><h2 id="sample-heading">{SAMPLE_TITLE}</h2></div>
-                <p>The original Silly Surprise sample.</p>
+                <p>A dry office comedy from Silly Surprise.</p>
               </div>
               <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-3">
                 <p id="sample-audio-label" className="flex items-center gap-2 px-1 font-bold">
@@ -133,7 +106,7 @@ export default function Landing() {
               <ol className="jam-sample-grid">
                 {SAMPLE_PAGES.map((page, i) => (
                   <li key={page.alt}>
-                    <img src={`/sample/page-${i + 1}.jpg`} alt={page.alt} width={768} height={576} loading="lazy" />
+                    <img src={`/story-art/fax-page-${i + 1}.jpg`} alt={page.alt} width={960} height={720} loading="lazy" />
                     <div><p className="jam-eyebrow">Page {i + 1}</p><p>{page.text}</p></div>
                   </li>
                 ))}
