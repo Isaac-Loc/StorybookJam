@@ -42,13 +42,13 @@ export const GENERATION_CAP_CREDITS = 400
  * is the true worst case. A whole game is about 8 credits.
  */
 /**
- * Per-host ceiling (estimated credits, about 14 games) inside the global one,
+ * Per-host ceiling (estimated credits) inside the global one,
  * so a single account cannot burn the whole budget. Rows carry the HOST's id.
  * No role can read the ledger, so the owner checks REAL spend with
  * `npx deepspace app usage --json` (the ledger holds estimates only).
  */
 export const HOST_CAP_CREDITS = 120
-export const COST_ESTIMATE_CREDITS = { 'llm-story': 2, 'llm-final': 3, image: 2 } as const
+export const COST_ESTIMATE_CREDITS = { 'llm-story': 2, 'llm-final': 3, image: 2, narration: 3 } as const
 export type SpendKind = keyof typeof COST_ESTIMATE_CREDITS
 
 export const LLM_MODEL = 'claude-haiku-5-5'
@@ -71,9 +71,17 @@ export const ART_STYLE =
   "Children's picture book illustration, soft watercolor and ink, warm friendly colors, simple shapes, no text, no letters, no words."
 
 export const PAGE_COUNT = 4
+/** At most 600 characters across four separately narrated pages. */
+export const PAGE_TEXT_MAX = 150
 
 export const IMAGE_STATUSES = ['pending', 'generating', 'ready', 'failed', 'skipped'] as const
 export type ImageStatus = (typeof IMAGE_STATUSES)[number]
+export const NARRATION_STATUSES = ['pending', 'ready', 'failed', 'skipped'] as const
+export type NarrationStatus = (typeof NARRATION_STATUSES)[number]
+
+export function pageMediaInFlight(page: { imageStatus: ImageStatus; narrationStatus?: NarrationStatus }): boolean {
+  return page.imageStatus === 'pending' || page.imageStatus === 'generating' || page.narrationStatus === 'pending'
+}
 
 export const NAME_MAX_LENGTH = 20
 export const WORD_MAX_LENGTH = 24
@@ -119,10 +127,10 @@ export const STORY_TITLE = 'Gerald and the Giant Problem'
  * at that index (see BLANK_SPECS). Indexes are story slots, not player slots.
  */
 export const STORY_PAGES: readonly string[] = [
-  'In {2}, there lived a {1} {0} named Gerald. Gerald had exactly one passion in life: {3}. He ate it for breakfast, he ate it for lunch, and once he ate it at a funeral.',
-  'One morning Gerald woke up to a strange noise. In his garden sat a giant {4}, taller than a house, going "{5}! {5}!" over and over. Gerald put on his slippers and decided to be brave about it.',
-  'Gerald tried to push the giant {4} away. It only grew bigger. He pulled it. It grew bigger. He yelled at it politely. It grew bigger. "Oh no," whispered Gerald, "only {3} can stop this."',
-  'So Gerald fed the giant {4} a whole {3}. The {4} gave a happy shudder, floated gently into the sky and drifted away, going "{5}" all the way to the horizon. And Gerald lived happily ever after. The end.',
+  'In {2} lived a {1} {0} named Gerald. His favorite food was {3}.',
+  'A strange noise woke Gerald. A giant {4} sat in the garden, shouting “{5}!”',
+  'Gerald pushed the giant {4}, but it only grew. “A bite of {3} might help,” he said.',
+  'The giant took a bite and smiled. It floated gently into the sky, leaving Gerald to finish breakfast.',
 ]
 
 /* ------------------------------------------------------------------ */

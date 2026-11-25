@@ -1,26 +1,123 @@
 /**
- * Finished story: four page cards. The text is readable the moment the story
- * is revealed; each illustration fills in live as its page row updates
- * (`useQuery('pages')` streams every change).
+ * Finished story: readable during generation, with a shared recording
+ * per page and a local slideshow transport for each player.
  */
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from 'deepspace'
 import { Button, useToast } from '@/components/ui'
 import { callAction } from '@/lib/callAction'
-import { MAX_PAGE_RETRIES, PAGE_COUNT } from '../../game'
+import { MAX_PAGE_RETRIES, PAGE_COUNT, pageMediaInFlight } from '../../game'
 import type { GamePhase } from '../../game'
 import type { PageView } from './types'
 
 /** While illustrating, nudge the server now and then so a stuck room self-heals (tick sweeps stale pages). */
 const SWEEP_NUDGE_MS = 30_000
+/** Text in a silent slide stays visible for at least a few seconds. */
+const MIN_READ_MS = 4_000
+const READ_MS_PER_CHARACTER = 65
 
 export function Revealed({ gameId, title, phase }: { gameId: string; title: string; phase: GamePhase }) {
+  return <StorySlideshow key={gameId} gameId={gameId} title={title} phase={phase} />
+}
+
+type Clip = { idx: number; audioUrl: string }
+
+function StorySlideshow({ gameId, title, phase }: { gameId: string; title: string; phase: GamePhase }) {
   const { records, status } = useQuery<PageView>('pages', { where: { gameId } })
   const pages = [...records].sort((a, b) => a.data.idx - b.data.idx)
   const drawable = pages.filter((p) => p.data.imageStatus !== 'skipped').length
   const ready = pages.filter((p) => p.data.imageStatus === 'ready').length
+  const bookReady = phase === 'ready' && pages.length === PAGE_COUNT && !pages.some(({ data }) => pageMediaInFlight(data))
+  const hasNarration = pages.some(({ data }) => data.narrationStatus === 'ready')
+  const [clips, setClips] = useState<Clip[] | null>(null)
+  const [clipLoad, setClipLoad] = useState(0)
+  const [active, setActive] = useState(0)
+  const [playing, setPlaying] = useState(false)
+  const [blocked, setBlocked] = useState(false)
+  const [mediaError, setMediaError] = useState<number | null>(null)
+  const audio = useRef<HTMLAudioElement>(null)
+  const attemptedAutoplay = useRef(false)
+  const playbackAttempt = useRef(0)
+  const clip = clips?.find(({ idx }) => idx === active)
+  const firstClipUrl = clips?.find(({ idx }) => idx === 0)?.audioUrl
+  const narratable = (clips?.length ?? 0) > 0
+  const silentPage = !clip || mediaError === active
+  const textLength = pages.find(({ data }) => data.idx === active)?.data.text.length ?? 0
+
+  useEffect(() => {
+    if (!bookReady || !hasNarration) return
+    let ignore = false
+    void callAction<Clip[]>('getNarration', { gameId }).then((result) => {
+      if (!ignore) setClips(result.success ? result.data : [])
+    })
+    return () => { ignore = true }
+  }, [bookReady, hasNarration, gameId, clipLoad])
+
+  const startPlayback = useCallback((url: string | undefined, idx: number) => {
+    const player = audio.current
+    if (!player) return
+    const attempt = ++playbackAttempt.current
+    setBlocked(false)
+    setMediaError(null)
+    setPlaying(true)
+    if (!url) {
+      player.pause()
+      player.removeAttribute('src')
+      return
+    }
+    if (player.getAttribute('src') !== url) player.src = url
+    void player.play().catch((error: unknown) => {
+      if (attempt !== playbackAttempt.current) return
+      if (error instanceof DOMException && error.name === 'NotAllowedError') {
+        setPlaying(false)
+        setBlocked(true)
+      } else {
+        setMediaError(idx)
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!bookReady || !narratable || attemptedAutoplay.current) return
+    attemptedAutoplay.current = true
+    startPlayback(firstClipUrl, 0)
+  }, [bookReady, firstClipUrl, narratable, startPlayback])
+
+  function pausePlayback() {
+    playbackAttempt.current++
+    audio.current?.pause()
+    setPlaying(false)
+    setBlocked(false)
+  }
+
+  function goTo(idx: number) {
+    if (idx === active) return
+    attemptedAutoplay.current = true
+    pausePlayback()
+    audio.current?.removeAttribute('src')
+    setMediaError(null)
+    setActive(idx)
+  }
+
+  const advance = useCallback(() => {
+    if (!playing) return
+    const next = active + 1
+    if (next >= PAGE_COUNT) {
+      setPlaying(false)
+      return
+    }
+    setActive(next)
+    const nextClip = clips?.find(({ idx }) => idx === next)
+    startPlayback(nextClip?.audioUrl, next)
+  }, [playing, active, clips, startPlayback])
+
+  useEffect(() => {
+    if (!playing || !silentPage) return
+    const timeout = setTimeout(advance, Math.max(MIN_READ_MS, textLength * READ_MS_PER_CHARACTER))
+    return () => clearTimeout(timeout)
+  }, [advance, playing, silentPage, textLength])
 
   useEffect(() => {
     if (phase !== 'generating') return
@@ -43,8 +140,53 @@ export function Revealed({ gameId, title, phase }: { gameId: string; title: stri
       {status === 'loading' || (pages.length === 0 && status !== 'error') ? (
         <p className="text-center text-muted-foreground">Unrolling the story...</p>
       ) : (
-        pages.map((p) => <PageCard key={p.recordId} gameId={gameId} page={p.data} />)
+        <section aria-label="Story pages" className="space-y-4">
+          {pages.map((p) => (
+            <PageCard key={p.recordId} gameId={gameId} page={p.data} hidden={p.data.idx !== active} />
+          ))}
+          <div className="flex flex-wrap items-center justify-center gap-2" aria-label="Page navigation">
+            <Button variant="outline" disabled={!pages.some(({ data }) => data.idx === active - 1)} onClick={() => goTo(active - 1)}>Previous</Button>
+            {pages.map(({ recordId, data: { idx } }) => (
+              <Button key={recordId} size="sm" variant={idx === active ? 'default' : 'outline'}
+                aria-label={`Page ${idx + 1}`} aria-current={idx === active ? 'page' : undefined} onClick={() => goTo(idx)}>
+                {idx + 1}
+              </Button>
+            ))}
+            <Button variant="outline" disabled={!pages.some(({ data }) => data.idx === active + 1)} onClick={() => goTo(active + 1)}>Next</Button>
+          </div>
+        </section>
       )}
+
+      {/* Keep one media element so user-granted playback carries over between pages. */}
+      <audio ref={audio} preload="auto" onEnded={() => { if (!silentPage) advance() }} onError={() => {
+        if (!audio.current?.error || !audio.current.hasAttribute('src')) return
+        playbackAttempt.current++
+        setMediaError(active)
+      }} data-testid="story-audio" />
+      {phase === 'generating' && pages.some(({ data }) => data.narrationStatus === 'pending') && (
+        <p className="text-center text-sm text-muted-foreground" role="status">Getting the read-aloud ready…</p>
+      )}
+      {bookReady && hasNarration && clips?.length === 0 && (
+        <p className="text-center text-sm text-muted-foreground">
+          Narration could not load.{' '}
+          <button type="button" className="underline" onClick={() => { setClips(null); setClipLoad((n) => n + 1) }}>Try again</button>
+        </p>
+      )}
+      {narratable && (
+        <div className="flex flex-wrap justify-center gap-2">
+          <Button type="button" onClick={() => playing ? pausePlayback() : startPlayback(clip?.audioUrl, active)}>
+            {playing ? 'Pause narration' : 'Play narration'}
+          </Button>
+          {active > 0 && (
+            <Button type="button" variant="outline" onClick={() => { setActive(0); startPlayback(firstClipUrl, 0) }}>
+              Replay from start
+            </Button>
+          )}
+        </div>
+      )}
+      {bookReady && blocked && <p className="text-center text-sm text-muted-foreground" role="status">Tap Play narration to listen.</p>}
+      {bookReady && mediaError === active && <p className="text-center text-sm text-muted-foreground" role="status">This page’s audio could not play. You can still read and turn pages.</p>}
+      {bookReady && clips && clips.length > 0 && !clip && <p className="text-center text-sm text-muted-foreground">Narration is unavailable for this page.</p>}
 
       {/* Always a way out, even while illustrating. */}
       <div className="text-center">
@@ -60,9 +202,9 @@ export function Revealed({ gameId, title, phase }: { gameId: string; title: stri
   )
 }
 
-function PageCard({ gameId, page }: { gameId: string; page: PageView }) {
+function PageCard({ gameId, page, hidden }: { gameId: string; page: PageView; hidden: boolean }) {
   return (
-    <article className="overflow-hidden rounded-lg border border-border bg-card" data-testid="story-page">
+    <article hidden={hidden} className="overflow-hidden rounded-lg border border-border bg-card" data-testid="story-page">
       <Illustration gameId={gameId} page={page} />
       <div className="p-6">
         <p className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">

@@ -12,17 +12,19 @@ change behavior, limits or decisions, update the relevant section.
   DeepSpace. Deadline was 2026-11-24 23:59 ET. The submission is the live URL,
   the repo and a short written note (see "Writeup" below).
 
-## 0. Resume here (state snapshot, 2026-11-24 about 8:15 PM ET)
+## 0. Resume here (state snapshot, 2026-11-24 ET)
 
-The deployed app was redeployed from the repo head at this snapshot (verify:
-the latest entry of `npx deepspace releases` should show the same commit as
-`git rev-parse --short HEAD`), and nothing is uncommitted. The game itself is
+Before the local narration and player progress changes, the deployed app
+matched the repo head. After deploying any new changes, verify the latest
+entry of `npx deepspace releases` against `git rev-parse --short HEAD`. The live game is
 unchanged since release #4 (commit 9b21f66), on which the developer played a
 full round with illustrations live. The last app-affecting change added the
 landing-page sample book (commit e9fd4d7, release #5); later commits only
 touch docs, and each docs fix was redeployed, which is why release numbers keep
-moving: do not hard-code release numbers in this file. All build work is done;
-what remains is the developer's own review of the note and the cleanup below.
+moving: do not hard-code release numbers in this file. This checkout adds
+narration, a slideshow, and player progress. Check the release ledger for
+deployment status. Live voice playback and settled narration cost are
+unverified without an approved paid run.
 
 First five minutes in a new session (read-only, free):
 ```bash
@@ -45,7 +47,10 @@ Next actions, in order (see section 3 for the table):
 3. DONE (draft): `docs/SUBMISSION_NOTE.md`. The developer must read it, edit it
    into their own voice, resolve the `[CONFIRM]` lines, and paste it into the
    portal. Re-check any number before changing it.
-4. **Final live check.** One more full live round; confirm that the latest
+4. **Final live check.** If shipping narration, get explicit approval before
+   committing, pushing, deploying, or making a paid provider call. Play one
+   full round to verify checkmarks, page order, autoplay fallback, and actual
+   cost. Confirm that the latest
    release commit in `npx deepspace releases` is the latest commit that changed
    app code (`git log` shows which later commits are docs-only), and that GitHub
    `dev` contains it. Before submitting, ideally deploy the final commit so the
@@ -68,9 +73,11 @@ code). Up to 6 players join. A language model writes a silly four-page story
 with 6 blanks; each blank is secretly dealt to a player, who sees only that
 blank's label ("an animal") and never the story. A 75-second timer runs; a
 player can tap "Use a safety word" and the server fills anything left when time
-runs out. When every blank is filled, a second model call rewrites any harmful
-player word, then four illustrations are generated. Rooms expire after 2 hours
-and are deleted. There are no public books.
+runs out. A checkmark shows when a player has filled all their own blanks.
+When every blank is filled, a second model call rewrites harmful player words,
+then four illustrations and four narration clips are generated. The book
+attempts playback when ready and turns a page when its clip ends. Rooms expire
+after 2 hours and are deleted. There are no public books.
 
 Why it exists as a design: the interesting technical part is that the hidden
 data is hidden by the SERVER (record permissions), not by the UI. A player's
@@ -85,13 +92,13 @@ prompts. Preserve that property in every change.
 | Players | 1 to 6; solo allowed; always 6 blanks, shuffled and dealt round-robin |
 | Timer | 75 s fill phase, enforced by the server; clients only display it |
 | Safety words | Per-blank safety words from the story draft; used on tap or when the timer expires |
-| Reveal | Automatic when the last blank is filled |
+| Reveal | Automatic when the last blank is filled. The slideshow tries autoplay and offers manual play and page controls |
 | Tone / art | Silly and absurd; one fixed art style (`ART_STYLE` in `src/game.ts`) |
-| Length | 4 pages |
+| Length | 4 pages, at most 150 characters per page and 600 across the four page bodies |
 | Sharing | No public books. A static pre-made sample book is on the landing page (`public/sample/`) |
 | Room lifetime | 2 hours, then deleted (cron + opportunistic cleanup) |
 | Spend | Generation is developer-billed. App-side cap 400 estimated credits globally, 120 per host; 100 credits kept for development testing |
-| Integrations | `anthropic` and `fal` only. No narration/audio, no video (video was too expensive: fal compute-priced runs reserve $2) |
+| Integrations | `anthropic`, `fal`, and `elevenlabs`. No video (fal compute-priced runs reserve $2) |
 
 ## 3. Status
 
@@ -105,6 +112,9 @@ Done and live (release history from `npx deepspace releases`):
 | #4 | 9b21f66 | Slice 2: model-written story, safety rewrite, 4 illustrations, spend ledger and caps, kill switch, deny-by-default integration proxy |
 | #5 | e9fd4d7 | Landing page sample book, rewritten README, submission-note draft |
 | later | docs only | Handoff corrections, each redeployed so the live app matches the repo head |
+
+The commit adding the narrated slideshow also adds player completion
+checkmarks. Use `npx deepspace releases` to see whether that commit is live.
 
 Remaining, in priority order:
 1. The developer reviews `docs/SUBMISSION_NOTE.md` and resolves its `[CONFIRM]` lines.
@@ -123,17 +133,18 @@ on any game collection (admin may delete `games`, `memberships` and `pages`).
 
 | Collection | Holds | Who can read |
 |---|---|---|
-| `games` | code, hostId, phase, playerIds, playerNames, phaseEndsAt, expiresAt, filledCount, totalBlanks, title | members who are in `playerIds` (`read: 'shared'`), admin all |
+| `games` | code, hostId, phase, playerIds, playerNames, phaseEndsAt, expiresAt, filledCount, finishedPlayerIds, totalBlanks, title | members who are in `playerIds` (`read: 'shared'`), admin all |
 | `memberships` | gameId, userId, name (the authoritative roster; unique per game+user) | own row; admin all |
 | `blanks` | label, value, filled, source, assignedTo | ONLY the assignee (`ownerField: assignedTo`, `read: 'own'` for member AND admin) |
 | `storyDrafts` | drafted template, safety words, image prompts, `finalPrompts` | NO role (server only). Its `uniqueOn gameId` doubles as the "start claimed" lock |
-| `pages` | gameId, idx, text, imageUrl, imageStatus, retries, playerIds | players (`shared`), admin all |
+| `pages` | gameId, idx, text, imageUrl, imageStatus, retries, narrationStatus, playerIds | players (`shared`), admin all |
+| `narrations` | gameId, idx, audioUrl (bounded MP3 data URL, unique per game and page) | no client role. Current room members can retrieve finished clips through `getNarration` |
 | `spendLedger` | append-only spend reservations (gameId, kind, ref, credits, userId) | NO role. NOT deleted by room cleanup |
 
 ### Server actions (`src/server/game/actions.ts`, wired in `src/actions/index.ts`)
 
 `createGame`, `joinGame`, `startGame`, `submitBlank`, `useSafetyWord`, `tick`,
-`retryPage`. Every action loads the record it was pointed at and checks the
+`retryPage`, `getNarration`. Every action loads the record it was pointed at and checks the
 caller against it, because action tools run with RBAC OFF
 (see the comment at the top of `src/server/action-routes.ts`).
 
@@ -154,7 +165,10 @@ exact transitions.
    `src/game.ts` on any failure/over-budget/kill switch); creates 6 blanks;
    sets `phaseEndsAt` only after blanks exist. Stale-claim recovery after 60 s.
 4. `submitBlank` / `useSafetyWord`: caller must own the blank and be a current
-   member; phase must be `filling`; a late call runs the expiry path.
+   member; phase must be `filling`. A late call runs the expiry path. The server
+   recount publishes which players filled every assigned blank. Chosen safety
+   words count as submitted. Server timeout fills do not count. Labels and
+   answers remain private.
 5. `tick`: any member's browser calls it when the countdown hits 0 (and while
    generating, every 30 s). Idempotent: fills empty blanks with safety words
    after the deadline, retries a failed reveal, sweeps stuck pages.
@@ -163,19 +177,29 @@ exact transitions.
    in as UNTRUSTED data; output validated; page rows created idempotently;
    image prompts live only in `storyDrafts.finalPrompts`; then the image job is
    enqueued. If the polish call fails or the cap is hit, pages are text-only
-   and images are `skipped` (raw player text never reaches fal).
-7. Image job `generate-images` (`src/jobs.ts`, `src/server/game/images.ts`,
+   and images and narration are `skipped`. Only polished output goes to fal
+   and ElevenLabs. Draft templates must fit after the longest valid
+   substitutions, and polished pages are also length checked.
+7. Media job `generate-images` (`src/jobs.ts`, `src/server/game/images.ts`,
    `AppJobRoom` in `worker.ts`): per page `fal/run-model` then poll
    `fal/get-result`; one auto-retry; deadlines and abort handling; marks pages
    `failed`/`skipped`; `maxAttempts: 2` (a re-run hits the duplicate ledger key,
    so no double spend). `retryPage` allows manual retries (max 2 per page) only
-   when the game is `ready`.
+   when the game is `ready`. In parallel, the job requests one low bitrate MP3
+   per page from ElevenLabs, with a unique spend reservation and no paid
+   retries. The game becomes ready once both kinds of media have settled.
+8. `getNarration` checks current membership, room expiry, and the ready phase
+   before returning stored clips. The slideshow tries to play page one,
+   advances on audio end, and holds a page with unavailable audio for a short
+   reading delay if the story has other clips. A story with no clips only
+   advances manually. Manual controls let players pause, resume, or turn pages.
+   Pausing or replaying does not bill.
 
 ### Cleanup and cron
 
 `src/cron.ts` task `cleanup-expired-rooms` every 15 minutes calls
 `cleanupExpiredGames` (`src/server/game/cleanup.ts`), which deletes expired
-rooms and their `memberships`, `blanks`, `storyDrafts`, `pages`. Every action
+rooms and their `memberships`, `blanks`, `storyDrafts`, `pages`, and `narrations`. Every action
 also refuses an expired room immediately. Verify with
 `npx deepspace logs --search cron`.
 
@@ -185,10 +209,15 @@ also refuses an expired room immediately. Verify with
 |---|---|---|
 | `anthropic/chat-completion` | story draft; polish and safety rewrite | model `claude-haiku-5-5`, `max_tokens` 4000 (the model spends output tokens on hidden reasoning; 1800 truncated the JSON), response has a `thinking` block first, parser takes the `text` block, 20 s timeout |
 | `fal/run-model`, `fal/get-result` | page images | `fal-ai/flux/schnell`, size 768x576 (the `landscape_4_3` preset made the platform estimate exceed the cap), ALWAYS `maxCostUsd: 0.005` |
+| `elevenlabs/generate-speech` | one MP3 clip per page | DeepSpace catalog lists US$0.0002/character on the free tier. Uses `eleven_flash_v2_5` and `mp3_22050_32` |
 
 Cost facts (100 credits = US$1; account is on the free tier with a 500-credit
 allowance): one image is billed up to 2.0 credits (0.005 x ~4x platform markup;
-fal itself reports ~$0.003); a whole game is roughly 5 to 8 credits. The ledger
+fal itself reports ~$0.003); a prior game without narration was roughly 5 to 8
+credits. Narration adds an estimated maximum of 3 credits per page and 12 per
+story, based on the catalog price and validated character limits. Each request
+contains just that page's body, with no header or separator. The actual
+narration cost is unverified without a paid run. The ledger
 estimates are `COST_ESTIMATE_CREDITS` in `src/game.ts`. The ledger is
 race-free: write the reservation row first, sum, delete your own row if over
 the cap. Real spend: `npx deepspace app usage --json`.
@@ -199,7 +228,7 @@ generation off (production default is ON). To switch off in production:
 
 Integration proxy: `src/server/http-routes.ts` + `src/server/integration-policy.ts`
 are DENY-BY-DEFAULT for browser calls (only `google` and `composio` are
-reachable; `anthropic`/`fal` are `serverOnly`). Without this, any signed-in user
+reachable; `anthropic`, `fal`, and `elevenlabs` are `serverOnly`). Without this, any signed-in user
 could spend the owner's credits. Do not loosen it.
 
 ### File map
@@ -208,7 +237,7 @@ could spend the owner's credits. Do not loosen it.
 src/game.ts                    shared constants, fixed story, pure helpers
 src/schemas/game-schemas.ts    collections + permissions (and its tests)
 src/actions/index.ts           action registry (guarded wrappers)
-src/server/game/               actions, roster, reveal, images, generate, story,
+src/server/game/               actions, roster, reveal, images, narration, generate, story,
                                llm, budget, cleanup, rules, deps (kill switch),
                                fakeTools + testSeed (test support only)
 src/server/integration-policy.ts, http-routes.ts   deny-by-default proxy
@@ -251,8 +280,8 @@ docs/SUBMISSION_NOTE.md        draft of the portal writeup (developer edits it)
 
 ## 6. Testing
 
-- `npm run type-check`, `npm run lint`, `npm run test:unit` (13 files, 153
-  tests at last count), `npm run build`. Run all four before any commit.
+- `npm run type-check`, `npm run lint`, `npm run test:unit`, and
+  `npm run build`. Run all four before any commit.
 - Unit tests use an in-memory fake of the action tools with scriptable
   integrations (`src/server/game/fakeTools.ts`), so no paid calls.
 - E2E: `npx deepspace test run tests/game.spec.ts` (about 1.5 minutes). Uses two
@@ -264,7 +293,8 @@ docs/SUBMISSION_NOTE.md        draft of the portal writeup (developer edits it)
 - E2E runs with generation OFF: the start command runs
   `tests/helpers/generation-off.mjs`, which appends `GENERATION_ENABLED=false`
   to the generated `.dev.vars` (skipped when `STORYBOOK_REAL_GENERATION=1`, which
-  spends real credits). The spec asserts pages show "skipped".
+  spends real credits). The spec checks skipped illustrations, no narration
+  control, shared player checkmarks, and manual slideshow navigation.
 - E2E limits: room creation is rate limited (5 per 10 min per user, 10 active
   rooms per user, rooms live 2 h), so a test account supports about 5 runs per
   2 hours. If a run fails at room creation, check for the refusal text before
@@ -323,15 +353,15 @@ docs/SUBMISSION_NOTE.md        draft of the portal writeup (developer edits it)
   if the cap grows a lot.
 - Duplicate display names are allowed; rooms are never listed or discoverable.
 - Possible next steps: Turnstile on room creation, per-join rate limiting,
-  persistent image storage, a public gallery with moderation, narration.
+  persistent image storage, a public gallery with moderation.
 
 ## 10. Writeup (the submission note)
 
 The note should cover: what was built; which DeepSpace integrations were used
-(`anthropic`, `fal`) and which platform features (realtime records, owner-only
+(`anthropic`, `fal`, and `elevenlabs` if the narration code ships) and which platform features (realtime records, owner-only
 permissions, server actions, background jobs, cron, secrets); why other
 integrations were left out; the main tradeoff (server-enforced hidden data and
-hard spend caps over feature count; no guests; no audio/video); what the agents
+hard spend caps over feature count; no guests or video); what the agents
 did (implementer plus independent reviewer; reviews found a spend hole, an
 admin-owner permission bug and stuck-state bugs) versus what the developer
 verified by hand (live solo and full rounds, credit usage, the account-owner
@@ -393,3 +423,6 @@ file. So:
   continuing in another agent tool (Codex). Mid-flight: nothing; remaining work
   is the developer's review of the note, the final live round, test-account
   cleanup and submitting.
+- 2026-11-24 (ET, evening): added player completion checkmarks and the short
+  narrated slideshow. Verified the two-player flow and mocked audio playback.
+  A paid live round still needs explicit approval.

@@ -8,7 +8,7 @@
  */
 
 import type { ActionHandler, ActionResult, ActionTools } from 'deepspace/worker'
-import type { BlankSource, GamePhase, ImageStatus } from '../../game'
+import type { BlankSource, GamePhase, ImageStatus, NarrationStatus } from '../../game'
 import type { GameEnv } from './deps'
 import { byJoinOrder, isParamsObject } from './rules'
 
@@ -46,6 +46,7 @@ export type GameRecord = {
   phaseEndsAt: number
   expiresAt: number
   filledCount: number
+  finishedPlayerIds?: string[]
   totalBlanks: number
   title: string
 }
@@ -80,9 +81,12 @@ export type PageRecord = {
   text: string
   imageUrl: string
   imageStatus: ImageStatus
+  narrationStatus?: NarrationStatus
   retries: number
   playerIds: string[]
 }
+
+export type NarrationRecord = { gameId: string; idx: number; audioUrl: string }
 
 /** A loaded record together with its id. */
 export type Loaded<T> = { id: string; data: T; createdAt: string; updatedAt?: string }

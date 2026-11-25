@@ -62,8 +62,8 @@ describe('game schemas', () => {
 
   // The app owner is automatically an admin AND plays, so "admin can read" must
   // be checked deliberately per collection. These hold server-only data.
-  it('no role (admin/owner included) can read or write the spend ledger or story drafts', () => {
-    for (const name of ['spendLedger', 'storyDrafts']) {
+  it('no role (admin/owner included) can read or write private collections', () => {
+    for (const name of ['spendLedger', 'storyDrafts', 'narrations']) {
       const c = schemas.find((s) => s.name === name)!
       const row = { data: { gameId: 'g1' }, createdBy: 'user-a' }
       for (const role of ['member', 'admin', 'viewer', '*']) {

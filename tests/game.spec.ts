@@ -102,6 +102,8 @@ test('two players: blanks stay private, then the story reveals with both words',
   await a.page.getByTestId('start-game').click()
   for (const p of [a.page, b.page]) {
     await expect(p.getByTestId('blank-card').first()).toBeVisible({ timeout: 20_000 })
+    await expect(p.getByTestId('player-progress').getByRole('listitem')).toHaveCount(2)
+    await expect(p.getByTestId('player-progress').locator('[data-finished="true"]')).toHaveCount(0)
   }
 
   // 6 blanks dealt 3 + 3, no overlap.
@@ -118,6 +120,11 @@ test('two players: blanks stay private, then the story reveals with both words',
   // A answers all of theirs; B must still see none of it, on screen or on the wire.
   const aWords = await fillAll(a.page, 'Alicezz')
   await expect(b.page.getByTestId('progress')).toContainText('3 of 6', { timeout: 20_000 })
+  for (const p of [a.page, b.page]) {
+    const players = p.getByTestId('player-progress').getByRole('listitem')
+    await expect(players.filter({ hasText: 'Alice' })).toHaveAttribute('data-finished', 'true')
+    await expect(players.filter({ hasText: 'Bob' })).toHaveAttribute('data-finished', 'false')
+  }
   const bTextAfter = await b.page.locator('body').innerText()
   for (const w of aWords) expect(bTextAfter).not.toContain(w)
   const wire = bFrames.join('\n')
@@ -140,6 +147,12 @@ test('two players: blanks stay private, then the story reveals with both words',
   for (const p of [a.page, b.page]) {
     await expect(p.getByTestId('story-page')).toHaveCount(4, { timeout: 30_000 })
     await expect(p.getByTestId('story-title')).toHaveText(/Gerald/)
+    await expect(p.getByTestId('story-page').filter({ visible: true })).toHaveCount(1)
+    await expect(p.getByRole('button', { name: 'Page 1', exact: true })).toHaveAttribute('aria-current', 'page')
+    await p.getByRole('button', { name: 'Next' }).click()
+    await expect(p.getByRole('button', { name: 'Page 2', exact: true })).toHaveAttribute('aria-current', 'page')
+    await p.getByRole('button', { name: 'Previous' }).click()
+    await expect(p.getByRole('button', { name: 'Page 1', exact: true })).toHaveAttribute('aria-current', 'page')
     const story = await p.getByTestId('story-page').allInnerTexts()
     const all = story.join('\n')
     for (const w of [...aWords, ...bWords]) expect(all).toContain(w)
@@ -147,6 +160,7 @@ test('two players: blanks stay private, then the story reveals with both words',
     // Specs run with generation OFF (tests/helpers/generation-off.mjs): the fixed
     // story, and every illustration is 'skipped'. This also proves nothing is spent.
     await expect(p.getByTestId('illustration-skipped')).toHaveCount(4)
+    await expect(p.getByRole('button', { name: 'Play narration' })).toHaveCount(0)
     await expect(p.getByTestId('play-again')).toBeVisible()
   }
   // Meaningfulness check: after the reveal the same text DOES reach B's socket,

@@ -11,7 +11,7 @@
  */
 
 import type { CollectionSchema, RolePermissions } from 'deepspace/schema'
-import { GAME_PHASES, IMAGE_STATUSES } from '../game'
+import { GAME_PHASES, IMAGE_STATUSES, NARRATION_STATUSES } from '../game'
 
 const NONE: RolePermissions = { read: false, create: false, update: false, delete: false }
 
@@ -39,6 +39,7 @@ export const gamesSchema: CollectionSchema = {
     num('phaseEndsAt'),
     num('expiresAt'), // epoch ms; room is dead from here on (see isExpired)
     num('filledCount'),
+    json('finishedPlayerIds', []),
     num('totalBlanks'),
     text('title', { default: '' }),
   ],
@@ -139,6 +140,12 @@ export const pagesSchema: CollectionSchema = {
       default: 'pending',
     },
     num('retries'), // manual retries used (max MAX_PAGE_RETRIES)
+    {
+      name: 'narrationStatus',
+      storage: 'text',
+      interpretation: { kind: 'select', options: [...NARRATION_STATUSES] },
+      default: 'skipped',
+    },
     json('playerIds', []), // copy of the game's players: what `shared` read checks
   ],
   uniqueOn: ['gameId', 'idx'],
@@ -151,6 +158,14 @@ export const pagesSchema: CollectionSchema = {
   },
 }
 
+/** Audio bytes stay off the realtime wire. Only the authorized read action returns them. */
+export const narrationsSchema: CollectionSchema = {
+  name: 'narrations',
+  columns: [text('gameId'), num('idx'), text('audioUrl')],
+  uniqueOn: ['gameId', 'idx'],
+  permissions: { '*': NONE, viewer: NONE, member: NONE, admin: NONE },
+}
+
 /**
  * Append-only record of ESTIMATED generation spend (see budget.ts). Server
  * only: no role can read or write it, admin and app owner included. It is
@@ -161,7 +176,7 @@ export const pagesSchema: CollectionSchema = {
 export const spendLedgerSchema: CollectionSchema = {
   name: 'spendLedger',
   columns: [
-    { name: 'kind', storage: 'text', interpretation: { kind: 'select', options: ['llm-story', 'llm-final', 'image'] } },
+    { name: 'kind', storage: 'text', interpretation: { kind: 'select', options: ['llm-story', 'llm-final', 'image', 'narration'] } },
     num('credits'),
     text('gameId'),
     text('userId'), // the room's HOST, for the per-host sub-cap
@@ -177,5 +192,6 @@ export const gameSchemas: CollectionSchema[] = [
   blanksSchema,
   storyDraftsSchema,
   pagesSchema,
+  narrationsSchema,
   spendLedgerSchema,
 ]

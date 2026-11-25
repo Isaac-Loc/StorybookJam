@@ -44,5 +44,6 @@ export const integrations: Record<
   // and can be switched off with GENERATION_ENABLED=false.
   anthropic: { billing: 'developer', serverOnly: true },
   fal: { billing: 'developer', serverOnly: true },
+  elevenlabs: { billing: 'developer', serverOnly: true },
   // openai: { billing: 'developer', anonymous: true },
 }

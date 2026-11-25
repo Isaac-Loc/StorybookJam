@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import { Check } from 'lucide-react'
 import { Badge, Button, Input, useToast } from '@/components/ui'
 import { useQuery } from 'deepspace'
 import { callAction } from '@/lib/callAction'
@@ -54,6 +55,18 @@ export function Filling({ gameId, game }: { gameId: string; game: GameView }) {
 
   return (
     <div className="mx-auto max-w-lg space-y-6 px-6 py-10">
+      <ul aria-label="Player progress" className="flex flex-wrap justify-center gap-2" data-testid="player-progress">
+        {game.playerIds.map((id) => {
+          const finished = game.finishedPlayerIds?.includes(id) ?? false
+          return (
+            <li key={id} data-finished={finished} className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-sm">
+              {game.playerNames[id] ?? 'Player'}
+              {finished && <Check aria-hidden="true" className="size-4 text-green-600 dark:text-green-400" />}
+              <span className="sr-only">: {finished ? 'Finished' : 'Still filling words'}</span>
+            </li>
+          )
+        })}
+      </ul>
       <header className="text-center">
         <p className="font-mono text-5xl font-bold tabular-nums" data-testid="countdown">
           {mm}:{ss}

@@ -36,6 +36,7 @@ import {
   IMAGE_POLL_MS,
   IMAGE_SIZE,
   IMAGE_TIMEOUT_MS,
+  pageMediaInFlight,
 } from '../../game'
 import { reserveSpend } from './budget'
 import type { GameRecord, Loaded, PageRecord, Tools } from './helpers'
@@ -203,10 +204,10 @@ export async function runImageJob(tools: Tools, gameId: string, opts: ImageJobOp
   await finishIfSettled(tools, gameId)
 }
 
-/** Phase 'ready' once no page is still pending or generating. */
+/** Phase 'ready' once all illustration and narration work has settled. */
 export async function finishIfSettled(tools: Tools, gameId: string): Promise<void> {
   const pages = await listPages(tools, gameId)
-  if (pages.length > 0 && !pages.some(inFlight)) {
+  if (pages.length > 0 && !pages.some(({ data }) => pageMediaInFlight(data))) {
     const game = await loadGame(tools, gameId)
     if (game && game.data.phase === 'generating') {
       await tools.update<GameRecord>('games', gameId, { phase: 'ready' })
@@ -223,7 +224,10 @@ export async function sweepStalePages(tools: Tools, gameId: string, now: number)
   for (const p of await listPages(tools, gameId)) {
     const age = now - Date.parse(p.updatedAt ?? p.createdAt)
     const limit = p.data.imageStatus === 'generating' ? STALE_GENERATING_MS : STALE_PENDING_MS
-    if (inFlight(p) && age >= limit) await tools.update<PageRecord>('pages', p.id, { imageStatus: 'failed' })
+    const patch: Partial<PageRecord> = {}
+    if (inFlight(p) && age >= limit) patch.imageStatus = 'failed'
+    if (p.data.narrationStatus === 'pending' && age >= STALE_PENDING_MS) patch.narrationStatus = 'failed'
+    if (Object.keys(patch).length > 0) await tools.update<PageRecord>('pages', p.id, patch)
   }
   await finishIfSettled(tools, gameId)
 }

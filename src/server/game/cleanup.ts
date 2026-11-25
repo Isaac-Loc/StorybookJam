@@ -13,7 +13,7 @@
 import type { Tools, GameRecord } from './helpers'
 
 /** Collections holding per-room child rows, all keyed by `gameId`. */
-const CHILD_COLLECTIONS = ['memberships', 'blanks', 'storyDrafts', 'pages'] as const
+const CHILD_COLLECTIONS = ['memberships', 'blanks', 'storyDrafts', 'pages', 'narrations'] as const
 
 /** Rows removed per deleteWhere call, and max calls per collection per room. */
 const DELETE_PAGE = 100

@@ -1,6 +1,7 @@
 import type { ActionHandler } from 'deepspace/worker'
 import type { Env } from '../../worker'
 import { guarded } from '../server/game/helpers'
+import { getNarration } from '../server/game/narration'
 import {
   createGame,
   joinGame,
@@ -20,4 +21,5 @@ export const actions: Record<string, ActionHandler<Env>> = {
   useSafetyWord: guarded(useSafetyWord),
   tick: guarded(tick),
   retryPage: guarded(retryPage),
+  getNarration: guarded(getNarration),
 }

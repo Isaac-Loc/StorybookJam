@@ -7,13 +7,14 @@
  * idempotent and to converge on the right answer.
  */
 
-import { fillTemplate, pickFrom, pickSafety } from '../../game'
+import { fillTemplate, pageMediaInFlight, pickFrom, pickSafety } from '../../game'
 import type { ImageStatus } from '../../game'
 import { reserveSpend } from './budget'
 import type { GenDeps } from './deps'
 import { polishStory } from './generate'
 import type { BlankRecord, DraftRecord, GameRecord, PageRecord, Tools } from './helpers'
 import { isDuplicate, listBlanks, listPages, loadDraft, loadGame } from './helpers'
+import { finishIfSettled } from './images'
 
 /** A reveal claim older than this with no pages means the claimant died. */
 const REVEAL_STALE_MS = 60_000
@@ -53,7 +54,7 @@ export async function expireGame(tools: Tools, gameId: string, deps: GenDeps): P
 }
 
 /**
- * Recount filled blanks, publish the count on the game, and reveal when
+ * Recount filled blanks, publish the count and finished player IDs, and reveal when
  * everything is filled.
  *
  * The count is a read-modify-write across independent requests, so two
@@ -69,22 +70,45 @@ export async function settle(tools: Tools, gameId: string, deps: GenDeps): Promi
     const game = await loadGame(tools, gameId)
     if (!game) return
     total = game.data.totalBlanks
-    filled = (await listBlanks(tools, gameId)).filter((b) => b.data.filled === 1).length
+    const blanks = await listBlanks(tools, gameId)
+    // A failed/partial query must not publish a misleading completion state.
+    if (!total || blanks.length !== total) return
+    const progress = fillProgress(blanks, game.data.playerIds)
+    filled = progress.filledCount
 
-    if (game.data.filledCount !== filled) {
-      await tools.update<GameRecord>('games', gameId, { filledCount: filled })
+    if (!sameProgress(game.data, progress)) {
+      await tools.update<GameRecord>('games', gameId, progress)
     }
 
     // Stable when a fresh read of both sides agrees with the count we used.
     const check = await loadGame(tools, gameId)
-    const recount = (await listBlanks(tools, gameId)).filter((b) => b.data.filled === 1).length
-    if (check && check.data.filledCount === recount) {
-      filled = recount
+    const reloaded = await listBlanks(tools, gameId)
+    if (reloaded.length !== total) return
+    const recount = fillProgress(reloaded, check?.data.playerIds ?? game.data.playerIds)
+    filled = recount.filledCount
+    if (check && sameProgress(check.data, recount)) {
       break
     }
   }
 
   if (total > 0 && filled === total) await reveal(tools, gameId, deps)
+}
+
+function fillProgress(blanks: Awaited<ReturnType<typeof listBlanks>>, playerIds: string[]) {
+  return {
+    filledCount: blanks.filter((blank) => blank.data.filled === 1).length,
+    finishedPlayerIds: playerIds.filter((id) => {
+      const assigned = blanks.filter((blank) => blank.data.assignedTo === id)
+      return assigned.length > 0 && assigned.every(({ data }) => data.filled === 1 && data.source !== 'timeout')
+    }),
+  }
+}
+
+function sameProgress(game: GameRecord, progress: ReturnType<typeof fillProgress>): boolean {
+  const finished = game.finishedPlayerIds ?? []
+  return game.filledCount === progress.filledCount &&
+    finished.length === progress.finishedPlayerIds.length &&
+    finished.every((id, i) => id === progress.finishedPlayerIds[i])
 }
 
 /**
@@ -138,6 +162,7 @@ export async function reveal(tools: Tools, gameId: string, deps: GenDeps): Promi
       text: pageTexts[idx],
       imageUrl: '',
       imageStatus: status,
+      narrationStatus: polished ? 'pending' : 'skipped',
       retries: 0,
       playerIds: game.data.playerIds,
     })
@@ -147,9 +172,8 @@ export async function reveal(tools: Tools, gameId: string, deps: GenDeps): Promi
   if (polished) {
     await tools.update<DraftRecord>('storyDrafts', draft.id, { finalPrompts: polished.map((p) => p.imagePrompt) })
   }
-  // Decide from the pages that actually exist (a takeover may inherit pending
-  // ones): text is readable right away, 'ready' straight away if nothing is left to draw.
-  const anyPending = (await listPages(tools, gameId)).some((p) => p.data.imageStatus === 'pending')
+  // A takeover can inherit pages still waiting for just one kind of media.
+  const anyPending = (await listPages(tools, gameId)).some(({ data }) => pageMediaInFlight(data))
   await tools.update<GameRecord>('games', gameId, {
     phase: anyPending ? 'generating' : 'ready',
     title: draft.data.title,
@@ -161,11 +185,12 @@ export async function reveal(tools: Tools, gameId: string, deps: GenDeps): Promi
     } catch {
       // Could not queue: let players retry each page instead of waiting forever.
       for (const p of await listPages(tools, gameId)) {
-        if (p.data.imageStatus === 'pending') {
-          await tools.update<PageRecord>('pages', p.id, { imageStatus: 'failed' })
-        }
+        const patch: Partial<PageRecord> = {}
+        if (p.data.imageStatus === 'pending') patch.imageStatus = 'failed'
+        if (p.data.narrationStatus === 'pending') patch.narrationStatus = 'failed'
+        if (Object.keys(patch).length > 0) await tools.update<PageRecord>('pages', p.id, patch)
       }
-      await tools.update<GameRecord>('games', gameId, { phase: 'ready' })
+      await finishIfSettled(tools, gameId)
     }
   }
 }

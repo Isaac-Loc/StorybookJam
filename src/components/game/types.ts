@@ -4,7 +4,7 @@
  * browser bundle never imports Worker code.
  */
 
-import type { GamePhase } from '../../game'
+import type { GamePhase, NarrationStatus } from '../../game'
 
 export type GameView = {
   code: string
@@ -15,6 +15,7 @@ export type GameView = {
   phaseEndsAt: number
   expiresAt: number
   filledCount: number
+  finishedPlayerIds?: string[]
   totalBlanks: number
   title: string
 }
@@ -35,5 +36,6 @@ export type PageView = {
   text: string
   imageUrl: string
   imageStatus: 'pending' | 'generating' | 'ready' | 'failed' | 'skipped'
+  narrationStatus?: NarrationStatus
   retries: number
 }
