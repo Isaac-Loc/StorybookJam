@@ -139,7 +139,7 @@
     box-shadow: 6px 6px 0 #221a29;
   }
 
-  .jam-hero-world, .jam-hero-book {
+  .jam-hero-world, .jam-hero-prompt {
     overflow: hidden;
     position: absolute;
     border: 2px solid #221a29;
@@ -148,33 +148,29 @@
   }
 
   .jam-hero-world { width: 31%; }
-  .jam-hero-space { left: 6%; top: 9%; transform: rotate(-15deg); }
-  .jam-hero-quest { right: 5%; bottom: 8%; transform: rotate(14deg); }
+  .jam-hero-space { left: 7%; top: 11%; transform: rotate(-15deg); }
+  .jam-hero-quest { right: 7%; bottom: 10%; transform: rotate(14deg); }
+  .jam-hero-silly { right: 15%; top: 9%; transform: rotate(8deg); }
   .jam-hero-world .jam-theme-art { aspect-ratio: 4 / 5; }
-  .jam-hero-book {
-    inset: 15% 15% 16% 17%;
-    border: 5px solid #fffdf8;
-    outline: 1.5px solid #221a29;
-    transform: rotate(5deg);
-  }
-  .jam-hero-book img { width: 100%; height: 100%; object-fit: cover; }
 
-  .jam-art-tag {
-    display: flex;
-    position: absolute;
-    bottom: 10%;
-    left: 5%;
-    align-items: center;
-    gap: .45rem;
-    padding: .48rem .7rem;
-    border: 1.5px solid #221a29;
-    border-radius: .45rem;
-    background: #fff9ef;
-    color: #221a29;
-    font-size: clamp(.7rem, 1.15vw, .85rem);
-    font-weight: 750;
-    box-shadow: 2px 3px 0 #221a29;
-    transform: rotate(-7deg);
+  .jam-hero-prompt {
+    inset: auto 12% 18% 13%;
+    padding: clamp(1rem, 3.8vw, 2.4rem);
+    background: #fffdf8;
+    transform: rotate(-8deg);
+  }
+
+  .jam-hero-answer {
+    margin-top: .25em;
+    font-size: clamp(1.85rem, 4vw, 3.4rem);
+    color: #54258f;
+    font-weight: 850;
+    letter-spacing: -.058em;
+    line-height: 1.04;
+    text-decoration: underline;
+    text-decoration-color: #c69ee0;
+    text-underline-offset: .13em;
+    text-decoration-thickness: .06em;
   }
 
   [data-world="silly"] { --world-ink: #54258f; --world-paper: #f1defb; --world-bright: #edb5ee; }
@@ -213,7 +209,12 @@
   .jam-world-card p, .jam-step-grid p { margin-top: .18rem; color: #504358; }
 
   .jam-theme-art { position: relative; isolation: isolate; overflow: hidden; aspect-ratio: 2.3; background: var(--world-paper); }
-  .jam-theme-art img { position: absolute; width: 100%; height: 100%; object-fit: cover; object-position: 50% 48%; }
+  .jam-theme-art[data-world="silly"] {
+    background:
+      radial-gradient(circle, #fae29c 0 11%, transparent 12%) 0 2px / 28px 28px,
+      repeating-linear-gradient(-40deg, #a04d9f 0 1px, transparent 1px 10px),
+      #642b89;
+  }
   .jam-theme-art[data-world="space"] {
     background:
       radial-gradient(circle at 18% 33%, #e8f0ff 1.5px, transparent 2px),
@@ -264,7 +265,6 @@
     transform: translate(-50%, -50%) rotate(-12deg);
   }
   .jam-theme-symbol svg { width: 55%; height: 55%; }
-  [data-world="silly"] > .jam-theme-symbol { inset: auto .55rem .55rem auto; width: 2.45rem; transform: rotate(-12deg); }
   [data-world="quest"] > .jam-theme-symbol { background: #f8f1be; }
 
   .jam-how { padding-block: clamp(2.75rem, 6vw, 4.75rem); }
@@ -306,18 +306,57 @@
   .jam-theme-choice:has(input:focus-visible) { outline: 3px solid var(--world-ink); outline-offset: 3px; }
   fieldset:disabled .jam-theme-choice { cursor: wait; }
 
-  .jam-story-page { overflow: hidden; background: var(--color-card); }
-  .jam-story-page:not([hidden]) { animation: jam-page-in .24s ease-out; }
-  .jam-story-copy { font-family: Georgia, serif; font-size: clamp(1.13rem, 2.7vw, 1.46rem); }
-  .jam-story-placeholder > .jam-theme-art { height: 100%; }
-  .jam-story-placeholder [data-world="silly"] > .jam-theme-symbol {
-    inset: 50% auto auto 50%;
-    width: clamp(3rem, 14vw, 6rem);
-    transform: translate(-50%, -50%) rotate(-12deg);
+  .jam-reader {
+    display: flex;
+    min-block-size: calc(100svh - 4rem);
+    flex-direction: column;
+    gap: .6rem;
+    padding: 1rem clamp(.75rem, 2.5vw, 2.75rem) 0;
+  }
+  .jam-reader-header, .jam-reader-stage, .jam-reader-toolbar, .jam-reader-progress {
+    width: min(100%, 100rem);
+    margin-inline: auto;
+  }
+  .jam-reader-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .55rem 1.5rem; }
+  .jam-reader-header .jam-display { font-size: clamp(1.8rem, 3.8vw, 3.2rem); overflow-wrap: anywhere; }
+  .jam-reader-stage {
+    display: grid;
+    flex: 1;
+    border: 1.5px solid #2b2231;
+    border-radius: clamp(.8rem, 2vw, 1.4rem);
+    overflow: hidden;
+    background: var(--world-paper);
+  }
+  .jam-story-page { min-width: 0; background: var(--color-card); }
+  .jam-story-page:not([hidden]) { display: grid; grid-template-rows: auto 1fr; animation: jam-page-in .24s ease-out; }
+  .jam-reader-art {
+    position: relative;
+    min-width: 0;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    background: var(--world-paper);
+  }
+  .jam-reader-image, .jam-story-placeholder > .jam-theme-art { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .jam-reader-image { object-fit: contain; }
+  .jam-story-placeholder .jam-theme-symbol { width: clamp(3rem, 14vw, 8rem); }
+  .jam-reader-copy { display: flex; min-width: 0; flex-direction: column; justify-content: center; padding: clamp(1rem, 4vw, 3.5rem); }
+  .jam-story-copy { font-family: Georgia, serif; font-size: clamp(1.16rem, 2.2vw, 1.85rem); }
+  .jam-reader-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem 1.25rem;
+    padding-block: .55rem max(.7rem, env(safe-area-inset-bottom));
+    background: var(--color-background);
+  }
+  @media (min-width: 48rem) and (min-height: 48rem) {
+    .jam-reader-toolbar { position: sticky; z-index: 1; bottom: 0; }
   }
 
   @media (min-width: 48rem) {
-    .jam-story-page:not([hidden]) { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: center; }
+    .jam-story-page:not([hidden]) { grid-template: 1fr / minmax(0, 1.85fr) minmax(0, 1fr); }
+    .jam-reader-art { aspect-ratio: auto; min-block-size: clamp(25rem, 62svh, 52rem); }
   }
 
   @media (max-width: 52rem) {

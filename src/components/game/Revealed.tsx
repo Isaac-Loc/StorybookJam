@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BookOpen, ChevronLeft, ChevronRight, Headphones, Pause } from 'lucide-react'
+import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, Headphones, Pause } from 'lucide-react'
 import { useQuery } from 'deepspace'
 import { Button, useToast } from '@/components/ui'
 import { callAction } from '@/lib/callAction'
@@ -133,14 +133,23 @@ function StorySlideshow({ gameId, title, phase, storyTheme, pageCount }: StoryPr
   }, [phase, gameId])
 
   return (
-    <div className="jam-room jam-container max-w-4xl space-y-5 py-7 sm:py-12" data-world={theme.id}>
-      <header className="text-center">
-        <p className="jam-eyebrow mb-2 justify-center" data-testid="active-story-theme"><BookOpen size={17} aria-hidden /> {theme.name}</p>
-        <h1 className="jam-display" data-testid="story-title">{title || 'Your story'}</h1>
+    <div className="jam-room jam-reader" data-world={theme.id}>
+      <header className="jam-reader-header">
+        <div className="min-w-0">
+          <p className="jam-eyebrow mb-2" data-testid="active-story-theme"><BookOpen size={17} aria-hidden /> {theme.name}</p>
+          <h1 className="jam-display" data-testid="story-title">{title || 'Your story'}</h1>
+        </div>
+        <Link
+          to="/home"
+          data-testid={phase === 'generating' ? 'back-home' : 'play-again'}
+          className="jam-text-link shrink-0 text-primary"
+        >
+          <ArrowLeft size={16} aria-hidden /> {phase === 'generating' ? 'Back home' : 'Play again'}
+        </Link>
       </header>
 
       {drawable > 0 && (
-        <p className="text-center text-sm text-muted-foreground" data-testid="illustration-progress">
+        <p className="jam-reader-progress text-sm text-muted-foreground" data-testid="illustration-progress">
           {ready} of {drawable} illustrations ready
         </p>
       )}
@@ -148,20 +157,10 @@ function StorySlideshow({ gameId, title, phase, storyTheme, pageCount }: StoryPr
       {status === 'loading' || (pages.length === 0 && status !== 'error') ? (
         <p className="text-center text-muted-foreground">Unrolling the story...</p>
       ) : (
-        <section aria-label="Story pages" className="jam-stage space-y-4 p-3 sm:p-4">
+        <section aria-label="Story pages" className="jam-reader-stage" data-testid="story-stage">
           {pages.map((p) => (
             <PageCard key={p.recordId} gameId={gameId} page={p.data} theme={theme.id} totalPages={totalPages} hidden={p.data.idx !== active} />
           ))}
-          <div className="flex flex-wrap items-center justify-center gap-2" aria-label="Page navigation">
-            <Button variant="outline" aria-label="Previous" disabled={!pages.some(({ data }) => data.idx === active - 1)} onClick={() => goTo(active - 1)}><ChevronLeft aria-hidden /><span className="hidden sm:inline">Previous</span></Button>
-            {pages.map(({ recordId, data: { idx } }) => (
-              <Button key={recordId} size="sm" variant={idx === active ? 'default' : 'outline'}
-                aria-label={`Page ${idx + 1}`} aria-current={idx === active ? 'page' : undefined} onClick={() => goTo(idx)}>
-                {idx + 1}
-              </Button>
-            ))}
-            <Button variant="outline" aria-label="Next" disabled={!pages.some(({ data }) => data.idx === active + 1)} onClick={() => goTo(active + 1)}><span className="hidden sm:inline">Next</span><ChevronRight aria-hidden /></Button>
-          </div>
         </section>
       )}
 
@@ -180,33 +179,37 @@ function StorySlideshow({ gameId, title, phase, storyTheme, pageCount }: StoryPr
           <button type="button" className="underline" onClick={() => { setClips(null); setClipLoad((n) => n + 1) }}>Try again</button>
         </p>
       )}
-      {narratable && (
-        <div className="flex flex-wrap justify-center gap-2">
-          <Button type="button" onClick={() => playing ? pausePlayback() : startPlayback(clip?.audioUrl, active)}>
-            {playing ? <Pause aria-hidden /> : <Headphones aria-hidden />}
-            {playing ? 'Pause narration' : 'Play narration'}
-          </Button>
-          {active > 0 && (
-            <Button type="button" variant="outline" onClick={() => { setActive(0); startPlayback(firstClipUrl, 0) }}>
-              Replay from start
-            </Button>
-          )}
-        </div>
-      )}
       {bookReady && blocked && <p className="text-center text-sm text-muted-foreground" role="status">Tap Play narration to listen.</p>}
       {bookReady && mediaError === active && <p className="text-center text-sm text-muted-foreground" role="status">This page’s audio could not play. You can still read and turn pages.</p>}
       {bookReady && clips && clips.length > 0 && !clip && <p className="text-center text-sm text-muted-foreground">Narration is unavailable for this page.</p>}
 
-      {/* Always a way out, even while illustrating. */}
-      <div className="text-center">
-        <Link
-          to="/home"
-          data-testid={phase === 'generating' ? 'back-home' : 'play-again'}
-          className="jam-text-link text-primary"
-        >
-          {phase === 'generating' ? 'Back home' : 'Play again'}
-        </Link>
-      </div>
+      {pages.length > 0 && (
+        <div className="jam-reader-toolbar">
+          <nav className="flex flex-wrap items-center justify-center gap-1 sm:gap-2" aria-label="Page navigation">
+            <Button size="icon" className="h-9 w-8 sm:size-10" variant="outline" aria-label="Previous" disabled={!pages.some(({ data }) => data.idx === active - 1)} onClick={() => goTo(active - 1)}><ChevronLeft aria-hidden /></Button>
+            {pages.map(({ recordId, data: { idx } }) => (
+              <Button key={recordId} size="icon" className="h-9 w-8 sm:size-10" variant={idx === active ? 'default' : 'outline'}
+                aria-label={`Page ${idx + 1}`} aria-current={idx === active ? 'page' : undefined} onClick={() => goTo(idx)}>
+                {idx + 1}
+              </Button>
+            ))}
+            <Button size="icon" className="h-9 w-8 sm:size-10" variant="outline" aria-label="Next" disabled={!pages.some(({ data }) => data.idx === active + 1)} onClick={() => goTo(active + 1)}><ChevronRight aria-hidden /></Button>
+          </nav>
+          {narratable && (
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button type="button" onClick={() => playing ? pausePlayback() : startPlayback(clip?.audioUrl, active)}>
+                {playing ? <Pause aria-hidden /> : <Headphones aria-hidden />}
+                {playing ? 'Pause narration' : 'Play narration'}
+              </Button>
+              {active > 0 && (
+                <Button type="button" variant="outline" onClick={() => { setActive(0); startPlayback(firstClipUrl, 0) }}>
+                  Replay from start
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -219,9 +222,9 @@ function PageCard({ gameId, page, theme, totalPages, hidden }: {
   hidden: boolean
 }) {
   return (
-    <article hidden={hidden} className="jam-story-page rounded-lg border border-border" data-testid="story-page">
+    <article hidden={hidden} className="jam-story-page" data-testid="story-page">
       <Illustration gameId={gameId} page={page} theme={theme} />
-      <div className="flex min-w-0 flex-col justify-center p-5 sm:p-7">
+      <div className="jam-reader-copy">
         <p className="jam-eyebrow mb-3">
           Page {page.idx + 1} of {totalPages}
         </p>
@@ -231,11 +234,11 @@ function PageCard({ gameId, page, theme, totalPages, hidden }: {
   )
 }
 
-/** Fixed 4:3 box for every state, so nothing jumps when an image arrives. */
+/** Consistent artwork space across pending, failed, and ready states. */
 function Illustration({ gameId, page, theme }: { gameId: string; page: PageView; theme: StoryThemeId }) {
   const { error } = useToast()
   const [retrying, setRetrying] = useState(false)
-  const box = 'flex aspect-[4/3] w-full items-center justify-center bg-muted text-sm text-muted-foreground'
+  const box = 'jam-reader-art flex items-center justify-center text-sm text-muted-foreground'
   const retriesLeft = MAX_PAGE_RETRIES - (page.retries ?? 0)
 
   async function retry() {
@@ -248,13 +251,13 @@ function Illustration({ gameId, page, theme }: { gameId: string; page: PageView;
   switch (page.imageStatus) {
     case 'ready':
       return (
-        <div className="aspect-[4/3] w-full bg-muted" data-testid="illustration-ready">
+        <div className="jam-reader-art" data-testid="illustration-ready">
           <img
             src={page.imageUrl}
             alt={`Illustration for page ${page.idx + 1}`}
             loading="lazy"
             decoding="async"
-            className="h-full w-full object-cover"
+            className="jam-reader-image"
           />
         </div>
       )
@@ -273,8 +276,8 @@ function Illustration({ gameId, page, theme }: { gameId: string; page: PageView;
       )
     case 'skipped':
       return (
-        <div className="jam-story-placeholder relative aspect-[4/3]" data-testid="illustration-skipped">
-          <ThemeArtwork theme={theme} decorativeOnly />
+        <div className="jam-reader-art jam-story-placeholder" data-testid="illustration-skipped">
+          <ThemeArtwork theme={theme} />
           <span className="absolute right-2 bottom-2 rounded bg-card px-2 py-1 text-xs font-semibold text-muted-foreground">Text-only page</span>
         </div>
       )

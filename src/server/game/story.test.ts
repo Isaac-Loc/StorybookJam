@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { LEGACY_PAGE_COUNT, LEGACY_PAGE_TEXT_MAX, PAGE_TEXT_MAX, WORD_MAX_LENGTH } from '../../game'
 import { parseModelJson, polishUserPrompt, validatePolished, validateStory, fixedStory, POLISH_SYSTEM } from './story'
 import { STORY_THEMES } from '../../story-themes'
 import { modelPolishJson, modelStoryJson } from './testSeed'
@@ -43,6 +44,12 @@ describe('validateStory', () => {
     expect(mutate((j) => (j.pages[0].text += 'z'.repeat(700)))).toBeNull()
   })
 
+  it('checks draft length after accounting for every placeholder substitution', () => {
+    const remaining = PAGE_TEXT_MAX - 3 * WORD_MAX_LENGTH - 2 // two spaces between the three words
+    expect(mutate((j) => (j.pages[0].text = '{0} {1} {2}' + 'x'.repeat(remaining)))).not.toBeNull()
+    expect(mutate((j) => (j.pages[0].text = '{0} {1} {2}' + 'x'.repeat(remaining + 1)))).toBeNull()
+  })
+
   it('rejects markdown anywhere in the content', () => {
     expect(mutate((j) => (j.title = '**Bold** title'))).toBeNull()
     expect(mutate((j) => (j.pages[1].text = 'Pip loved `code` {3}. {0}{1}{2}{4}{5}'))).toBeNull()
@@ -69,6 +76,17 @@ describe('validatePolished', () => {
   it('accepts six clean pages for new stories', () => {
     const r = validatePolished(modelPolishJson(true))
     expect(r?.pages).toHaveLength(6)
+  })
+
+  it('permits longer new pages and preserves the shorter legacy limit', () => {
+    const j = modelPolishJson()
+    j.pages[0].text = 'x'.repeat(PAGE_TEXT_MAX)
+    expect(validatePolished(j)).not.toBeNull()
+    expect(validatePolished({ pages: j.pages.slice(0, LEGACY_PAGE_COUNT) }, LEGACY_PAGE_COUNT)).toBeNull()
+    j.pages[0].text += 'x'
+    expect(validatePolished(j)).toBeNull()
+    j.pages[0].text = 'x'.repeat(LEGACY_PAGE_TEXT_MAX)
+    expect(validatePolished({ pages: j.pages.slice(0, LEGACY_PAGE_COUNT) }, LEGACY_PAGE_COUNT)).not.toBeNull()
   })
   it('rejects wrong page counts, leftover placeholders and empty prompts', () => {
     const j = modelPolishJson()

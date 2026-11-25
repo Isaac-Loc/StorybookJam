@@ -41,7 +41,8 @@ export const GENERATION_CAP_CREDITS = 400
  * Conservative per-call estimates written to the spend ledger BEFORE a call.
  * Measured: an image bills 1.2 credits when fal reports its cost and settles,
  * but 2.0 when it does not (the $0.005 maxCostUsd ceiling x the 4x markup), so 2
- * is the true worst case. A whole game is about 8 credits.
+ * is the true worst case. A narration clip reserves 4 credits for up to
+ * 200 characters at the free-tier rate of 0.02 credits per character.
  */
 /**
  * Per-host ceiling (estimated credits) inside the global one,
@@ -50,7 +51,7 @@ export const GENERATION_CAP_CREDITS = 400
  * `npx deepspace app usage --json` (the ledger holds estimates only).
  */
 export const HOST_CAP_CREDITS = 120
-export const COST_ESTIMATE_CREDITS = { 'llm-story': 2, 'llm-final': 3, image: 2, narration: 3 } as const
+export const COST_ESTIMATE_CREDITS = { 'llm-story': 2, 'llm-final': 3, image: 2, narration: 4 } as const
 export type SpendKind = keyof typeof COST_ESTIMATE_CREDITS
 
 export const LLM_MODEL = 'claude-haiku-5-5'
@@ -73,12 +74,17 @@ export const ART_STYLE = STORY_THEMES[0].artStyle
 
 export const LEGACY_PAGE_COUNT = 4
 export const PAGE_COUNT = 6
-/** At most 900 characters across six separately narrated pages. */
-export const PAGE_TEXT_MAX = 150
+/** At most 1,200 characters across six separately narrated pages. */
+export const PAGE_TEXT_MAX = 200
+export const LEGACY_PAGE_TEXT_MAX = 150
 
 /** Older rooms have no stored page count. */
 export function storyPageCount(value?: number): number {
   return value === PAGE_COUNT ? PAGE_COUNT : LEGACY_PAGE_COUNT
+}
+
+export function storyPageTextMax(pageCount: number): number {
+  return pageCount === LEGACY_PAGE_COUNT ? LEGACY_PAGE_TEXT_MAX : PAGE_TEXT_MAX
 }
 
 export const IMAGE_STATUSES = ['pending', 'generating', 'ready', 'failed', 'skipped'] as const
@@ -134,12 +140,12 @@ export const STORY_TITLE = 'Gerald and the Giant Problem'
  * at that index (see BLANK_SPECS). Indexes are story slots, not player slots.
  */
 export const STORY_PAGES: readonly string[] = [
-  'In {2} lived a {1} {0} named Gerald. His favorite food was {3}.',
-  'A strange noise woke Gerald. A giant {4} sat in the garden, shouting “{5}!”',
-  'Gerald put on his slippers and tiptoed outside. The giant had swallowed his favorite garden chair.',
-  'Gerald pushed the giant {4}, but it only grew. “A bite of {3} might help,” he said.',
-  'The giant took a bite and smiled. Then it sneezed, and the missing chair landed right beside Gerald.',
-  'The giant floated gently into the sky. Gerald sat down to finish breakfast, and the garden was quiet at last.',
+  'In {2} lived a {1} {0} named Gerald. His one policy was {3} in the garden before anyone could ask for a favor.',
+  'One morning a strange noise rattled his plate. A giant {4} sat where his chair belonged, issuing what sounded like a formal complaint: “{5}!”',
+  'Gerald found a chair leg between the giant’s teeth. “I take it you’re sitting here?” he said. The giant hiccuped. Under the circumstances, it sounded like a yes.',
+  'Gerald tried pushing it aside. Each hiccup made it swell, so he changed tactics and set down his {3}. The giant stopped long enough to consider the offer.',
+  'It took a bite and sneezed the chair straight back into position. Gerald tested the seat with one finger. He wanted a receipt, but decided not to press.',
+  'The giant floated gently over the fence. Gerald sat down to finish breakfast and put a second chair out for tomorrow. It seemed wiser than escalating.',
 ]
 
 /* ------------------------------------------------------------------ */

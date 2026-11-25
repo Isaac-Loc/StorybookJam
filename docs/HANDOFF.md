@@ -14,11 +14,12 @@ change behavior, limits or decisions, update the relevant section.
 
 ## 0. Resume here (state snapshot, 2026-11-24 ET)
 
-The last verified live release and GitHub `dev` head were at `b2f8e77`, which
-shipped the redesigned frontend and host-selected themes. This checkout adds
-six-page rounds and bundled sample narration. Verify deployment by comparing
+The last verified live release and GitHub `dev` head were at `4414442`, with
+six-page rounds and bundled sample narration. This checkout lengthens the
+pages, moves the tone toward deadpan comedy for friend groups, and gives
+the finished story a viewport-sized reader. Verify deployment by comparing
 `npx deepspace releases` with `git rev-parse --short HEAD`. Sample narration
-and its one-time charge are verified. A live six-page round is unverified.
+and its one-time charge are verified. The longer rounds are unverified live.
 
 First five minutes in a new session (read-only, free):
 ```bash
@@ -88,8 +89,8 @@ prompts. Preserve that property in every change.
 | Timer | 75 s fill phase, enforced by the server; clients only display it |
 | Safety words | Per-blank safety words from the story draft; used on tap or when the timer expires |
 | Reveal | Automatic when the last blank is filled. The slideshow tries autoplay and offers manual play and page controls |
-| Tone / art | The host chooses Silly Surprise (default, bright watercolor), Space Trouble (retro space comic), or Tiny Quest (cut-paper backyard adventure). The theme guides the story, blank prompts, illustration style, and book accents. |
-| Length | New rounds have 6 pages, at most 150 characters per page and 900 across the page bodies. Existing 4-page rounds remain readable and can finish. |
+| Tone / art | Deadpan absurdity and genre parody for friend groups, with the existing all-ages safety pass. The host chooses Silly Surprise (editorial watercolor), Space Trouble (retro sci-fi pulp), or Tiny Quest (cut-paper adventure). The theme guides the story, blank prompts, illustration style, and reader accents. |
+| Length | New rounds have 6 pages, at most 200 characters per page and 1,200 across the page bodies. The prompt asks for connected scenes and an ending that pays off the setup. Existing 4-page rounds can finish with their original 150-character page limit. |
 | Sharing | No public player books. The landing page has a four-page sample book (`public/sample/`) and a bundled recording (`src/assets/sample-narration.mp3`). Playing it makes no integration calls. |
 | Room lifetime | 2 hours, then deleted (cron + opportunistic cleanup) |
 | Spend | Generation is developer-billed. App-side cap 400 estimated credits globally, 120 per host; 100 credits kept for development testing |
@@ -109,9 +110,10 @@ Done and live (release history from `npx deepspace releases`):
 | later | docs only | Handoff corrections, each redeployed so the live app matches the repo head |
 | later | 7b36c0e | Narrated slideshow and player completion checkmarks |
 | later | b2f8e77 | Redesigned frontend and host-selected story themes |
+| later | 4414442 | Six-page stories and bundled sample narration |
 
-This checkout adds the saved sample narration and six-page stories for new
-rounds. Use `npx deepspace releases` to verify the currently live commit.
+This checkout adds longer, more connected pages and the larger finished-book
+reader. Use `npx deepspace releases` to verify the currently live commit.
 
 Remaining, in priority order:
 1. The developer reviews `docs/SUBMISSION_NOTE.md` and resolves its `[CONFIRM]` lines.
@@ -198,7 +200,8 @@ exact transitions.
    before returning stored clips. The slideshow tries to play page one,
    advances on audio end, and holds a page with unavailable audio for a short
    reading delay if the story has other clips. A story with no clips only
-   advances manually. Manual controls let players pause, resume, or turn pages.
+   advances manually. The reader uses most of the viewport and keeps page
+   controls grouped with playback. Players can pause, resume, or turn pages.
    Pausing or replaying does not bill.
 
 ### Cleanup and cron
@@ -220,11 +223,11 @@ also refuses an expired room immediately. Verify with
 Cost facts (100 credits = US$1; account is on the free tier with a 500-credit
 allowance): one image is billed up to 2.0 credits (0.005 x ~4x platform markup;
 fal itself reports ~$0.003); a prior game without narration was roughly 5 to 8
-credits. Narration adds an estimated maximum of 3 credits per page and 18 per
-six-page story. Each request contains just that page's body, with no title or
-separator. With the two story calls and first attempts at all illustrations
-and clips, the ledger reserves 35 credits for a six-page round. Retries may
-add image costs. A live six-page round has not been measured. The sample's
+credits. Narration adds an estimated maximum of 4 credits per 200-character
+page and 24 per six-page story. Each request contains just that page's body,
+with no title or separator. With the two story calls and first attempts at all
+illustrations and clips, the ledger reserves 41 credits for a six-page round.
+Retries may add image costs. A live longer round has not been measured. The sample's
 543-character combined recording cost 10.86 credits once. Serving the saved
 MP3 does not call ElevenLabs. The ledger
 estimates are `COST_ESTIMATE_CREDITS` in `src/game.ts`. The ledger is
@@ -447,3 +450,7 @@ file. So:
   for 10.86 credits and verified browser playback from the saved MP3. Expanded
   new rounds to six pages, with four-page compatibility covered by unit tests
   and six-page navigation verified in the two-player browser test.
+- 2026-11-24 (ET, evening): lengthened new pages, rewrote the themed stories
+  for drier comedy and stronger continuity, and expanded the finished-book
+  reader. Verified desktop and phone layouts, two-player navigation, and
+  mocked narration. No paid live longer round was run.

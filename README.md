@@ -1,7 +1,7 @@
 # StorybookJam
 
-Co-write a picture book with friends, Mad Libs style, without seeing the story
-until it's done.
+Co-write an absurd story with friends, Mad Libs style, without seeing the
+story until it's done.
 
 Try it: https://storybookjam.app.space
 

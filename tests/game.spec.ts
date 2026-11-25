@@ -86,6 +86,7 @@ async function fillAll(page: Page, prefix: string): Promise<string[]> {
 test('two players: blanks stay private, then the story reveals with both words', async ({ users }) => {
   test.setTimeout(120_000)
   const [a, b] = await users(['Storybook A', 'Storybook B'])
+  await b.page.setViewportSize({ width: 390, height: 844 })
   const bFrames = captureFrames(b.page)
 
   const code = await createRoom(a.page, 'Alice')
@@ -156,6 +157,9 @@ test('two players: blanks stay private, then the story reveals with both words',
     await expect(p.getByTestId('story-title')).toHaveText(/Crater Caper/)
     await expect(p.getByTestId('active-story-theme')).toHaveText('Space Trouble')
     await expect(p.getByTestId('story-page').filter({ visible: true })).toHaveCount(1)
+    const storyStage = await p.getByTestId('story-stage').boundingBox()
+    expect(storyStage?.width ?? 0).toBeGreaterThan(await p.evaluate(() => innerWidth * 0.9))
+    expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(await p.evaluate(() => innerWidth))
     await expect(p.getByRole('button', { name: 'Page 1', exact: true })).toHaveAttribute('aria-current', 'page')
     await p.getByRole('button', { name: 'Next' }).click()
     await expect(p.getByRole('button', { name: 'Page 2', exact: true })).toHaveAttribute('aria-current', 'page')

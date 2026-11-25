@@ -69,9 +69,9 @@ export default function Landing() {
         <main>
           <section aria-labelledby="hero-heading" className="jam-container jam-hero">
             <div>
-              <p className="jam-eyebrow"><span className="jam-dot" /> The multiplayer story game</p>
+              <p className="jam-eyebrow"><span className="jam-dot" /> A fill-in-the-blank party game</p>
               <h1 id="hero-heading" className="jam-hero-title">Make a story.<br /><em>Make it weird.</em></h1>
-              <p className="jam-hero-copy">Get your friends together, fill in secret blanks, and hear your words turn into an illustrated story.</p>
+              <p className="jam-hero-copy">Give your friends a few secret prompts. Their answers turn into an illustrated story you get to hear together.</p>
               <div className="jam-hero-actions">
                 <Link to="/home" className="jam-button">Start playing <ArrowRight size={19} aria-hidden /></Link>
                 <a href="#sample" className="jam-text-link">See a sample <ArrowDown size={16} aria-hidden /></a>
@@ -82,10 +82,11 @@ export default function Landing() {
             <div className="jam-hero-art" aria-hidden>
               <div className="jam-hero-world jam-hero-space"><ThemeArtwork theme="space" /></div>
               <div className="jam-hero-world jam-hero-quest"><ThemeArtwork theme="quest" /></div>
-              <div className="jam-hero-book">
-                <img src="/sample/page-1.jpg" alt="" width={768} height={576} fetchPriority="high" />
+              <div className="jam-hero-world jam-hero-silly"><ThemeArtwork theme="silly" /></div>
+              <div className="jam-hero-prompt">
+                <p className="jam-eyebrow"><PencilLine size={16} aria-hidden /> A suspicious object</p>
+                <p className="jam-hero-answer">haunted fax machine</p>
               </div>
-              <span className="jam-art-tag"><PencilLine size={18} /> A ridiculous <strong>________</strong></span>
             </div>
           </section>
 
@@ -121,7 +122,7 @@ export default function Landing() {
             <div className="jam-container">
               <div className="jam-section-heading">
                 <div><p className="jam-eyebrow"><BookOpen size={18} aria-hidden /> Sample book</p><h2 id="sample-heading">{SAMPLE_TITLE}</h2></div>
-                <p>A small taste of Silly Surprise.</p>
+                <p>The original Silly Surprise sample.</p>
               </div>
               <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-3">
                 <p id="sample-audio-label" className="flex items-center gap-2 px-1 font-bold">

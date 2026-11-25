@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BLANK_COUNT, LEGACY_PAGE_COUNT, PAGE_COUNT, PAGE_TEXT_MAX, STORY_PAGES, WORD_MAX_LENGTH, fillTemplate } from '../../game'
+import { BLANK_COUNT, LEGACY_PAGE_COUNT, LEGACY_PAGE_TEXT_MAX, PAGE_COUNT, PAGE_TEXT_MAX, STORY_PAGES, WORD_MAX_LENGTH, fillTemplate } from '../../game'
 import { cleanupExpiredGames } from './cleanup'
 import { createFakeTools } from './fakeTools'
 import { finishIfSettled } from './images'
@@ -31,6 +31,8 @@ describe('narrated stories', () => {
   it.each([PAGE_COUNT, LEGACY_PAGE_COUNT])('prepares each clip once and only serves audio to room members after generation (%s pages)', async (pageCount) => {
     const { tools, gameId } = await prepare(pageCount)
     const indices = Array.from({ length: pageCount }, (_, idx) => idx)
+    const longestPage = 'x'.repeat(pageCount === PAGE_COUNT ? PAGE_TEXT_MAX : LEGACY_PAGE_TEXT_MAX)
+    await tools.update('pages', tools.rows('pages')[0].recordId, { text: longestPage })
     await finishIfSettled(tools, gameId)
     expect(tools.rows('games')[0].data.phase).toBe('generating')
     expect(await runAction(getNarration, 'host', tools, { gameId })).toMatchObject({ success: false })
@@ -38,9 +40,9 @@ describe('narrated stories', () => {
     await runNarration(tools, gameId, true)
     expect(tools.integrationCalls).toEqual(indices.map((idx) => ({
       endpoint: 'elevenlabs/generate-speech',
-      body: { text: `page ${idx}`, model_id: 'eleven_flash_v2_5', output_format: 'mp3_22050_32' },
+      body: { text: idx === 0 ? longestPage : `page ${idx}`, model_id: 'eleven_flash_v2_5', output_format: 'mp3_22050_32' },
     })))
-    expect(tools.rows('spendLedger').map((row) => row.data.credits)).toEqual(Array(pageCount).fill(3))
+    expect(tools.rows('spendLedger').map((row) => row.data.credits)).toEqual(Array(pageCount).fill(4))
     expect(tools.rows('pages').every((row) => !('audioUrl' in row.data))).toBe(true)
 
     await finishIfSettled(tools, gameId)
@@ -67,16 +69,21 @@ describe('narrated stories', () => {
     expect(queued).toEqual([gameId])
   })
 
-  it.each(['over length', 'generation off', 'over budget'] as const)('skips narration without spending when %s', async (reason) => {
-    const { tools, gameId } = await prepare()
-    if (reason === 'over length') await tools.update('pages', tools.rows('pages')[0].recordId, { text: 'x'.repeat(PAGE_TEXT_MAX + 1) })
+  it.each([
+    { reason: 'over length', pageCount: PAGE_COUNT, textLength: PAGE_TEXT_MAX + 1 },
+    { reason: 'over length in a legacy round', pageCount: LEGACY_PAGE_COUNT, textLength: LEGACY_PAGE_TEXT_MAX + 1 },
+    { reason: 'generation off', pageCount: PAGE_COUNT },
+    { reason: 'over budget', pageCount: PAGE_COUNT },
+  ])('skips narration without spending when $reason', async ({ reason, pageCount, textLength }) => {
+    const { tools, gameId } = await prepare(pageCount)
+    if (textLength) await tools.update('pages', tools.rows('pages')[0].recordId, { text: 'x'.repeat(textLength) })
     if (reason === 'over budget') {
       await tools.create('spendLedger', { kind: 'narration', credits: 120, gameId: 'old', userId: 'host', ref: 'old' })
     }
     await runNarration(tools, gameId, reason !== 'generation off')
     await finishIfSettled(tools, gameId)
     expect(tools.integrationCalls).toHaveLength(0)
-    expect(tools.rows('pages').map((row) => row.data.narrationStatus)).toEqual(Array(PAGE_COUNT).fill('skipped'))
+    expect(tools.rows('pages').map((row) => row.data.narrationStatus)).toEqual(Array(pageCount).fill('skipped'))
     expect(tools.rows('games')[0].data.phase).toBe('ready')
   })
 })

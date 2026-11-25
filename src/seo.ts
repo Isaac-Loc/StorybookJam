@@ -25,7 +25,7 @@ import { APP_NAME } from './constants'
 declare const __DEEPSPACE_SITE_ORIGIN__: string | undefined
 
 export const seo = {
-  title: 'StorybookJam | Silly multiplayer story game',
+  title: 'StorybookJam | Fill-in-the-blank party game',
   description:
     'Pick a world, fill secret blanks with friends, and hear your words turn into an illustrated story in StorybookJam.',
   /** Public origin for canonical URLs, og:url, and the sitemap — no trailing

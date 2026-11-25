@@ -3,23 +3,23 @@ export const STORY_THEMES = [
   {
     id: 'silly',
     name: 'Silly Surprise',
-    description: 'Big laughs, everyday oddities, and a splash of bright watercolor.',
-    setting: 'A familiar everyday setting turned upside down by a ridiculous surprise.',
-    artStyle: "Children's picture book illustration, soft watercolor and ink, warm friendly colors, simple shapes, no text, no letters, no words.",
+    description: 'Everyday life takes an absurd turn, in warm watercolor and ink.',
+    setting: 'An everyday inconvenience escalates into something absurd. Play the characters straight and let their overly practical reactions carry the comedy.',
+    artStyle: 'Warm editorial watercolor and ink illustration, textured paper, expressive gestures, understated visual comedy, no text, no letters, no words.',
   },
   {
     id: 'space',
     name: 'Space Trouble',
-    description: 'Odd planets, tiny aliens, and wonky spaceships in retro comic color.',
-    setting: 'A warm, funny space adventure with odd planets, tiny aliens, or wonky spaceships. Use blank prompts that fit the adventure.',
-    artStyle: "Children's picture book illustration in a retro space comic style, bold ink outlines, brightly colored halftone dots and playful rockets or planets, no text, no letters, no words.",
+    description: 'Odd planets and interstellar mishaps in retro science fiction comic color.',
+    setting: 'A retro science fiction caper in which a routine mission meets one very specific cosmic problem. Use genre parody, contrasting priorities, and blank prompts that fit the mission.',
+    artStyle: 'Retro science fiction pulp comic illustration, bold ink lines, halftone dots, cinematic framing, expressive silhouettes, no text, no letters, no words.',
   },
   {
     id: 'quest',
     name: 'Tiny Quest',
-    description: 'Tiny heroes and unlikely treasures in an oversized cut-paper world.',
-    setting: 'An epic-but-silly backyard adventure told from the point of view of a very small hero. Make everyday objects feel enormous and use blank prompts that fit the adventure.',
-    artStyle: "Children's picture book illustration in layered cut-paper collage, oversized backyard details, visible paper edges, friendly shapes and soft shadows, no text, no letters, no words.",
+    description: 'A pocket-sized expedition with oversized stakes, in layered cut paper.',
+    setting: 'A miniature adventure that treats a backyard expedition with the seriousness of an epic quest. Make ordinary objects feel enormous and give the travelers distinct motives.',
+    artStyle: 'Layered cut-paper adventure illustration, visible paper fibers and crisp edges, dramatic miniature perspective, soft directional light, no text, no letters, no words.',
   },
 ] as const
 

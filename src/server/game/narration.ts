@@ -1,4 +1,4 @@
-import { isExpired, PAGE_TEXT_MAX, storyPageCount } from '../../game'
+import { isExpired, storyPageCount, storyPageTextMax } from '../../game'
 import { reserveSpend } from './budget'
 import { fail, findMembership, listPages, loadGame, ok } from './helpers'
 import type { GameAction, Loaded, NarrationRecord, PageRecord, Tools } from './helpers'
@@ -43,12 +43,13 @@ async function narratePage(
   page: Loaded<PageRecord>,
   hostId: string,
   expiresAt: number,
+  textMax: number,
   enabled: boolean,
   signal?: AbortSignal,
 ): Promise<void> {
   const { gameId, idx, text } = page.data
   let status: PageRecord['narrationStatus'] = 'skipped'
-  if (enabled && !signal?.aborted && expiresAt > Date.now() && text.length > 0 && text.length <= PAGE_TEXT_MAX) {
+  if (enabled && !signal?.aborted && expiresAt > Date.now() && text.length > 0 && text.length <= textMax) {
     const reservation = await reserveSpend(tools, 'narration', gameId, `p${idx}`, hostId)
     if (reservation === 'ok') {
       status = 'failed'
@@ -76,14 +77,16 @@ export async function runNarration(
   const game = await loadGame(tools, gameId)
   if (!game) return
   const pages = await listPages(tools, gameId)
+  const pageCount = storyPageCount(game.data.pageCount)
+  const textMax = storyPageTextMax(pageCount)
   // The reveal only leaves narration pending after the safety pass. All
   // pages must fit the cap before we pay for any of them.
-  const canNarrate = enabled && pages.length === storyPageCount(game.data.pageCount) &&
-    pages.every(({ data }) => data.text.length > 0 && data.text.length <= PAGE_TEXT_MAX)
+  const canNarrate = enabled && pages.length === pageCount &&
+    pages.every(({ data }) => data.text.length > 0 && data.text.length <= textMax)
   await Promise.allSettled(
     pages.filter(({ data }) => data.narrationStatus === 'pending').map(async (page) => {
       try {
-        await narratePage(tools, page, game.data.hostId, game.data.expiresAt, canNarrate, signal)
+        await narratePage(tools, page, game.data.hostId, game.data.expiresAt, textMax, canNarrate, signal)
       } catch {
         await tools.update<PageRecord>('pages', page.id, { narrationStatus: 'failed' })
       }
