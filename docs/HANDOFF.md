@@ -15,13 +15,14 @@ change behavior, limits or decisions, update the relevant section.
 ## 0. Resume here (state snapshot, 2026-11-24 about 8:30 PM ET)
 
 Last deployed: release #4, commit 9b21f66 (live and working: a full round with
-illustrations was played by the developer on the live site). The only
-uncommitted work is documentation (this file, CLAUDE.md, AGENTS.md pointer).
+illustrations was played by the developer on the live site). Commits after it
+are documentation only (this file, CLAUDE.md, the AGENTS.md pointer), so the
+deployed app and the repo head differ only in docs. Nothing is uncommitted.
 
 First five minutes in a new session (read-only, free):
 ```bash
 git status && git log --oneline -5
-npx deepspace releases          # latest release commit should equal origin/dev
+npx deepspace releases          # latest release = last DEPLOYED commit (docs-only commits may be ahead on origin/dev)
 npx deepspace app usage --json  # credits used / remaining (100 credits = US$1)
 npm run type-check && npm run lint && npm run test:unit && npm run build
 ```
@@ -42,8 +43,11 @@ Next actions, in order (see section 3 for the table):
 3. **Submission note.** Draft it as `docs/SUBMISSION_NOTE.md` for the developer
    to paste into the portal (see section 10). Use measured numbers only; leave
    clearly marked blanks for things only the developer can attest to.
-4. **Final live check.** One more full live round; confirm
-   `npx deepspace releases` and GitHub `dev` show the same commit.
+4. **Final live check.** One more full live round; confirm that the latest
+   release commit in `npx deepspace releases` is the latest commit that changed
+   app code (`git log` shows which later commits are docs-only), and that GitHub
+   `dev` contains it. Before submitting, ideally deploy the final commit so the
+   live app and the repo head match exactly.
 5. **Clean up test accounts** (ask first):
    `npx deepspace test accounts delete --email storybook-a@deepspace.test` and
    the same for `storybook-b@deepspace.test`. Do this last, after the final
@@ -238,7 +242,8 @@ tests/helpers/generation-off.mjs   turns generation off for e2e
 - Deploy needs a clean, committed tree. `npx deepspace deploy` ships the LOCAL
   commit; pushing to GitHub does not deploy. Workflow: commit, deploy, push,
   then confirm with `npx deepspace releases` that the latest release commit
-  equals the latest GitHub commit.
+  is the latest commit that changed app code and that GitHub contains it
+  (docs-only commits can legitimately sit ahead of the deployed release).
 
 ## 6. Testing
 
@@ -377,5 +382,6 @@ file. So:
 - 2026-11-24 (ET, evening): scaffold, slice 1 (rooms, hidden blanks, timer,
   rate limits, 2-hour expiry), owner-admin fix, slice 2 (model story, safety
   rewrite, images, spend ledger, kill switch, deny-by-default proxy), live
-  full-round verified by the developer, handoff docs written. Mid-flight: docs
-  uncommitted; slice 3 and the submission note not started.
+  full-round verified by the developer, handoff docs written and committed.
+  Mid-flight: nothing; slice 3 (landing sample, README) and the submission
+  note are not started.
