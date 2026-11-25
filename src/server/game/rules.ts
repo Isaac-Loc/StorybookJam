@@ -12,7 +12,7 @@ import {
 } from '../../game'
 
 /** A start claim younger than this might belong to a start still in progress. */
-export const STALE_CLAIM_MS = 10_000
+export const STALE_CLAIM_MS = 60_000 // Start now includes a model call of up to ~20 s
 
 /**
  * Is an existing `storyDrafts` row a leftover from a start that died half way,

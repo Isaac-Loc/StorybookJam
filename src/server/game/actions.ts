@@ -18,14 +18,12 @@
 
 import {
   BLANK_COUNT,
-  BLANK_SPECS,
   FILL_SECONDS,
   MAX_ACTIVE_ROOMS_GLOBAL,
   MAX_PLAYERS,
   MIN_PLAYERS,
   ROOM_TTL_MS,
-  STORY_PAGES,
-  STORY_TITLE,
+  MAX_PAGE_RETRIES,
   cleanName,
   cleanWord,
   dealBlanks,
@@ -33,7 +31,6 @@ import {
   isExpired,
   isValidCode,
   normalizeCode,
-  pickSafety,
 } from '../../game'
 import type {
   BlankRecord,
@@ -41,6 +38,7 @@ import type {
   GameAction,
   GameRecord,
   Loaded,
+  PageRecord,
   MembershipRecord,
   Tools,
 } from './helpers'
@@ -49,13 +47,20 @@ import {
   findMembership,
   isDuplicate,
   listBlanks,
+  listPages,
   listMemberships,
   loadBlank,
   loadGame,
   ok,
 } from './helpers'
 import { cleanupExpiredGames } from './cleanup'
-import { expireGame, settle } from './reveal'
+import { makeDeps, generationEnabled } from './deps'
+import type { GenDeps } from './deps'
+import { draftStory } from './generate'
+import { sweepStalePages } from './images'
+import { expireGame, safetyWordFor, settle } from './reveal'
+import { fixedStory } from './story'
+import { isParamsObject } from './rules'
 import { findGameByCode, isOverCapacity, joinRank, syncRoster } from './roster'
 import { capRoster, decideCreate, isStaleClaim } from './rules'
 
@@ -229,7 +234,8 @@ async function claimStart(
   tools: Tools,
   gameId: string,
 ): Promise<{ ok: true; draftId: string } | { ok: false; error: string }> {
-  const draft = { gameId, title: STORY_TITLE, pages: [...STORY_PAGES] }
+  const f = fixedStory() // placeholder content: startGame overwrites it with the real draft
+  const draft = { gameId, title: f.title, pages: f.pages, labels: f.labels, safety: f.safety, imagePrompts: f.imagePrompts, finalPrompts: [], source: f.source }
   const first = await tools.create<DraftRecord>('storyDrafts', draft)
   if (first.success) return { ok: true, draftId: first.data.recordId }
   if (!isDuplicate(first)) return { ok: false, error: first.error }
@@ -255,7 +261,7 @@ async function claimStart(
   return { ok: false, error: isDuplicate(retry) ? 'The game has already started.' : retry.error }
 }
 
-export const startGame: GameAction = async ({ userId, params, tools }) => {
+export const startGame: GameAction = async ({ userId, params, tools, env }) => {
   const game = await loadGame(tools, str(params.gameId))
   if (!game) return fail('Game not found.')
   if (isExpired(game.data, Date.now())) return fail(EXPIRED_MESSAGE)
@@ -265,6 +271,8 @@ export const startGame: GameAction = async ({ userId, params, tools }) => {
   const claim = await claimStart(tools, game.id)
   if (!claim.ok) return fail(claim.error)
 
+  // Blanks THIS run created, so a failure removes only its own (never a concurrent start's).
+  const createdBlankIds: string[] = []
   try {
     // Read the roster only AFTER claiming: joinGame backs out when it sees the claim.
     // Only the first MAX_PLAYERS (join order) play; anyone past that (should not
@@ -273,20 +281,41 @@ export const startGame: GameAction = async ({ userId, params, tools }) => {
     for (const extra of overflow) await tools.remove('memberships', extra.id)
     if (members.length < MIN_PLAYERS) throw new Error(`Need at least ${MIN_PLAYERS} player to start.`)
 
+    // ONE model call writes this game's story (or we fall back to the fixed
+    // one). It runs BEFORE any blank exists and the 75 s timer only starts in
+    // the final update below, so a slow model call never eats player time.
+    // The draft (templates, safety words, image prompts) stays server-side.
+    const story = await draftStory(tools, game.id, game.data.hostId, generationEnabled(env))
+    // The model call can be slow: if our claim was meanwhile judged stale and
+    // taken over by another start, our draft is gone and we must stand down
+    // without touching anything that start created.
+    if (!(await tools.get('storyDrafts', claim.draftId)).success) throw new Error('The game has already started.')
+    const saved = await tools.update<DraftRecord>('storyDrafts', claim.draftId, {
+      title: story.title,
+      pages: story.pages,
+      labels: story.labels,
+      safety: story.safety,
+      imagePrompts: story.imagePrompts,
+      source: story.source,
+    })
+    if (!saved.success) throw new Error(saved.error)
+
     const playerIds = members.map((m) => m.data.userId)
     const assignments = dealBlanks(playerIds)
     const results = await Promise.all(
-      assignments.map((a) =>
-        tools.create<BlankRecord>('blanks', {
+      assignments.map(async (a) => {
+        const r = await tools.create<BlankRecord>('blanks', {
           gameId: game.id,
           idx: a.idx,
-          label: BLANK_SPECS[a.idx].label,
+          label: story.labels[a.idx],
           value: '',
           filled: 0,
           source: '',
           assignedTo: a.assignedTo,
-        }),
-      ),
+        })
+        if (r.success) createdBlankIds.push(r.data.recordId)
+        return r
+      }),
     )
     const failed = results.find((r) => !r.success)
     if (failed && !failed.success) throw new Error(failed.error)
@@ -307,7 +336,7 @@ export const startGame: GameAction = async ({ userId, params, tools }) => {
     // Release the claim so the host can try again instead of being stuck.
     // Best-effort: an error inside cleanup must not mask the original error
     // (and a leftover claim is healed by claimStart's stale-claim check).
-    await bestEffort(() => tools.deleteWhere('blanks', { gameId: game.id }))
+    for (const id of createdBlankIds) await bestEffort(() => tools.remove('blanks', id))
     await bestEffort(() => tools.remove('storyDrafts', claim.draftId))
     return fail(e instanceof Error ? e.message : 'Could not start the game.')
   }
@@ -326,6 +355,7 @@ type FillContext = { blank: Loaded<BlankRecord>; game: Loaded<GameRecord> }
  */
 async function authorizeFill(
   tools: Tools,
+  deps: GenDeps,
   userId: string,
   blankId: string,
 ): Promise<{ ok: true; ctx: FillContext } | { ok: false; error: string }> {
@@ -342,15 +372,16 @@ async function authorizeFill(
     // Known and accepted: a submit that passed the checks just before the
     // deadline can overwrite a timeout word written a few ms later. Either
     // value is a valid word, so the story is unaffected.
-    await expireGame(tools, game.id)
+    await expireGame(tools, game.id, deps)
     return { ok: false, error: "Time's up! Safety words were used for the empty blanks." }
   }
   if (blank.data.filled === 1) return { ok: false, error: 'That blank is already filled.' }
   return { ok: true, ctx: { blank, game } }
 }
 
-export const submitBlank: GameAction = async ({ userId, params, tools }) => {
-  const auth = await authorizeFill(tools, userId, str(params.blankId))
+export const submitBlank: GameAction = async ({ userId, params, tools, env }) => {
+  const deps = makeDeps(env, userId)
+  const auth = await authorizeFill(tools, deps, userId, str(params.blankId))
   if (!auth.ok) return fail(auth.error)
   const value = cleanWord(params.value)
   if (!value) return fail('Type a word or short phrase (1-24 characters).')
@@ -358,22 +389,23 @@ export const submitBlank: GameAction = async ({ userId, params, tools }) => {
   const { blank, game } = auth.ctx
   const u = await tools.update<BlankRecord>('blanks', blank.id, { value, filled: 1, source: 'player' })
   if (!u.success) return fail(u.error)
-  await settle(tools, game.id)
+  await settle(tools, game.id, deps)
   return ok({ blankId: blank.id })
 }
 
-export const useSafetyWord: GameAction = async ({ userId, params, tools }) => {
-  const auth = await authorizeFill(tools, userId, str(params.blankId))
+export const useSafetyWord: GameAction = async ({ userId, params, tools, env }) => {
+  const deps = makeDeps(env, userId)
+  const auth = await authorizeFill(tools, deps, userId, str(params.blankId))
   if (!auth.ok) return fail(auth.error)
 
   const { blank, game } = auth.ctx
   const u = await tools.update<BlankRecord>('blanks', blank.id, {
-    value: pickSafety(blank.data.idx),
+    value: await safetyWordFor(tools, game.id, blank.data.idx), // this game's own safety list
     filled: 1,
     source: 'safety',
   })
   if (!u.success) return fail(u.error)
-  await settle(tools, game.id)
+  await settle(tools, game.id, deps)
   return ok({ blankId: blank.id })
 }
 
@@ -386,21 +418,69 @@ export const useSafetyWord: GameAction = async ({ userId, params, tools }) => {
  * seconds afterwards). Safe to call at any time, from any number of clients:
  * it does nothing unless the game is `filling` and the deadline has passed.
  */
-export const tick: GameAction = async ({ userId, params, tools }) => {
+export const tick: GameAction = async ({ userId, params, tools, env }) => {
+  const deps = makeDeps(env, userId)
   const game = await loadGame(tools, str(params.gameId))
   // Non-members get the same answer as a missing game.
   if (!game || !(await findMembership(tools, game.id, userId))) return fail('Game not found.')
 
   if (isExpired(game.data, Date.now())) return fail(EXPIRED_MESSAGE)
+  if (game.data.phase === 'generating') {
+    // Self-heal: fail pages stuck in flight so the room can never stay here forever.
+    await sweepStalePages(tools, game.id, Date.now())
+    return ok({ phase: (await loadGame(tools, game.id))?.data.phase ?? game.data.phase })
+  }
   if (game.data.phase !== 'filling') return ok({ phase: game.data.phase })
 
   if (Date.now() >= game.data.phaseEndsAt) {
-    await expireGame(tools, game.id)
+    await expireGame(tools, game.id, deps)
   } else if (game.data.totalBlanks > 0 && game.data.filledCount >= game.data.totalBlanks) {
     // Everything is filled but the reveal never completed (a failed write):
     // retry it rather than waiting out the clock.
-    await settle(tools, game.id)
+    await settle(tools, game.id, deps)
   }
   const after = await loadGame(tools, game.id)
   return ok({ phase: after?.data.phase ?? game.data.phase })
+}
+
+/* ------------------------------------------------------------------ */
+/* retryPage                                                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Player pressed "Retry" on a failed illustration. Caller must be a current
+ * member; the page must be 'failed'; at most MAX_PAGE_RETRIES presses per page.
+ * Budget is checked (and the cap enforced) by the image job, per attempt.
+ */
+export const retryPage: GameAction = async ({ userId, params, tools, env }) => {
+  const game = await loadGame(tools, str(params.gameId))
+  // Non-members get the same answer as a missing game.
+  if (!game || !(await findMembership(tools, game.id, userId))) return fail('Game not found.')
+  if (isExpired(game.data, Date.now())) return fail(EXPIRED_MESSAGE)
+  // Only once the game has settled to `ready`. While `generating`, an earlier
+  // image job may still be running, and its final cleanup (it fails any page
+  // still in flight) could swallow a page we just put back to `pending`,
+  // burning the retry without drawing anything.
+  if (game.data.phase === 'generating') return fail('Other illustrations are still being drawn. Try again in a moment.')
+  if (game.data.phase !== 'ready') return fail('There is nothing to retry yet.')
+
+  const idx = params.idx
+  const page = typeof idx === 'number' ? (await listPages(tools, game.id)).find((p) => p.data.idx === idx) : undefined
+  if (!page) return fail('Page not found.')
+  if (page.data.imageStatus !== 'failed') return fail('Only a failed illustration can be retried.')
+  if ((page.data.retries ?? 0) >= MAX_PAGE_RETRIES) return fail('That illustration has used all of its retries.')
+
+  const deps = makeDeps(env, userId)
+  if (!deps.enabled) return fail('Illustrations are switched off right now.')
+
+  await tools.update<PageRecord>('pages', page.id, { imageStatus: 'pending', retries: (page.data.retries ?? 0) + 1 })
+  await tools.update<GameRecord>('games', game.id, { phase: 'generating' })
+  try {
+    await deps.enqueueImages(game.id)
+  } catch {
+    await tools.update<PageRecord>('pages', page.id, { imageStatus: 'failed' })
+    await tools.update<GameRecord>('games', game.id, { phase: 'ready' })
+    return fail('Could not start the illustration. Please try again.')
+  }
+  return ok({ idx: page.data.idx })
 }

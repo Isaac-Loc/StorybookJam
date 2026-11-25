@@ -28,6 +28,53 @@ export const MAX_ACTIVE_ROOMS_PER_USER = 10
 /** ...and a global ceiling so bots cannot flood storage. */
 export const MAX_ACTIVE_ROOMS_GLOBAL = 300
 
+/* ---- Generation (slice 2) ---- */
+
+/**
+ * Lifetime ceiling on ESTIMATED credits the app may spend on generation.
+ * (The account has 500; the other 100 are reserved for development testing.)
+ */
+export const GENERATION_CAP_CREDITS = 400
+/**
+ * Conservative per-call estimates written to the spend ledger BEFORE a call.
+ * Measured: an image bills 1.2 credits when fal reports its cost and settles,
+ * but 2.0 when it does not (the $0.005 maxCostUsd ceiling x the 4x markup), so 2
+ * is the true worst case. A whole game is about 8 credits.
+ */
+/**
+ * Per-host ceiling (estimated credits, about 14 games) inside the global one,
+ * so a single account cannot burn the whole budget. Rows carry the HOST's id.
+ * No role can read the ledger, so the owner checks REAL spend with
+ * `npx deepspace app usage --json` (the ledger holds estimates only).
+ */
+export const HOST_CAP_CREDITS = 120
+export const COST_ESTIMATE_CREDITS = { 'llm-story': 2, 'llm-final': 3, image: 2 } as const
+export type SpendKind = keyof typeof COST_ESTIMATE_CREDITS
+
+export const LLM_MODEL = 'claude-haiku-5-5'
+export const LLM_TIMEOUT_MS = 20_000
+export const IMAGE_MODEL_ID = 'fal-ai/flux/schnell'
+/** Hard per-image spend ceiling passed to fal (its default would reserve $2). */
+export const IMAGE_MAX_COST_USD = 0.005
+/**
+ * 4:3 picture-book frame. A custom size, not the 'landscape_4_3' preset: the
+ * preset (1024x768) made the platform estimate up to $0.006 and refuse our
+ * $0.005 ceiling (measured); 768x576 is accepted and costs $0.003 (~1.2 credits).
+ */
+export const IMAGE_SIZE = { width: 768, height: 576 } as const
+export const IMAGE_POLL_MS = 1000
+export const IMAGE_TIMEOUT_MS = 60_000
+/** Manual "Retry" presses allowed per page. */
+export const MAX_PAGE_RETRIES = 2
+/** One fixed art style for every page; the per-page prompt is appended. */
+export const ART_STYLE =
+  "Children's picture book illustration, soft watercolor and ink, warm friendly colors, simple shapes, no text, no letters, no words."
+
+export const PAGE_COUNT = 4
+
+export const IMAGE_STATUSES = ['pending', 'generating', 'ready', 'failed', 'skipped'] as const
+export type ImageStatus = (typeof IMAGE_STATUSES)[number]
+
 export const NAME_MAX_LENGTH = 20
 export const WORD_MAX_LENGTH = 24
 
@@ -176,7 +223,13 @@ export function dealBlanks(playerIds: readonly string[]): BlankAssignment[] {
   return assignments.sort((a, b) => a.idx - b.idx)
 }
 
-/** A random safety word for the blank at `blankIdx`. */
+/** A random pick from a list of safety words (per-game lists come from the story draft). */
+export function pickFrom(words: readonly string[]): string {
+  if (words.length === 0) throw new RangeError('pickFrom: empty list')
+  return words[randomInt(words.length)]
+}
+
+/** A random safety word for the blank at `blankIdx` (the built-in story's list). */
 export function pickSafety(blankIdx: number): string {
   const spec = BLANK_SPECS[blankIdx]
   if (!spec) throw new RangeError(`pickSafety: no blank ${blankIdx}`)

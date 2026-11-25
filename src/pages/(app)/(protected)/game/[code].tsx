@@ -56,8 +56,11 @@ export default function GamePage() {
   const { phase } = game.data
   if (phase === 'lobby') return <Lobby gameId={game.recordId} game={game.data} myId={userId} />
   if (phase === 'filling') return <Filling gameId={game.recordId} game={game.data} />
-  if (phase === 'revealed') return <Revealed gameId={game.recordId} title={game.data.title} />
+  // generating / ready (and the legacy 'revealed') all show the story; the
+  // illustrations fill in live while the phase is 'generating'.
+  if (phase === 'generating' || phase === 'ready' || phase === 'revealed') {
+    return <Revealed gameId={game.recordId} title={game.data.title} phase={phase} />
+  }
 
-  // generating / ready / failed arrive in later slices.
-  return <p className="py-16 text-center text-muted-foreground">Working on your story ({phase})...</p>
+  return <p className="py-16 text-center text-muted-foreground">Something went wrong with this room ({phase}).</p>
 }

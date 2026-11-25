@@ -44,7 +44,13 @@ async function createRoom(page: Page, name: string): Promise<string> {
   await page.goto('/home')
   await page.getByTestId('display-name').fill(name)
   await page.getByTestId('create-room').click()
-  await expect(page.getByTestId('room-code')).toBeVisible({ timeout: 20_000 })
+  // Fail with the REAL reason if the room-creation rate limit refused us (an
+  // account can create 5 rooms per 10 minutes), instead of a vague timeout.
+  const refusal = page.getByText(/too quickly|already host|very busy/)
+  await expect(page.getByTestId('room-code').or(refusal)).toBeVisible({ timeout: 20_000 })
+  if (await refusal.isVisible()) {
+    throw new Error('Room creation was refused by the rate limit (wait 10 minutes after earlier runs of this account): ' + (await refusal.innerText()))
+  }
   const code = (await page.getByTestId('room-code').innerText()).trim()
   expect(code).toMatch(/^[A-HJKMNP-Z2-9]{5}$/)
   return code
@@ -138,6 +144,10 @@ test('two players: blanks stay private, then the story reveals with both words',
     const all = story.join('\n')
     for (const w of [...aWords, ...bWords]) expect(all).toContain(w)
     expect(all).not.toMatch(/\{\d\}/)
+    // Specs run with generation OFF (tests/helpers/generation-off.mjs): the fixed
+    // story, and every illustration is 'skipped'. This also proves nothing is spent.
+    await expect(p.getByTestId('illustration-skipped')).toHaveCount(4)
+    await expect(p.getByTestId('play-again')).toBeVisible()
   }
   // Meaningfulness check: after the reveal the same text DOES reach B's socket,
   // so its absence above is real and not a broken capture.

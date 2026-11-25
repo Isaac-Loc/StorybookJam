@@ -30,6 +30,7 @@ import {
 } from 'deepspace/worker'
 import type { ExpoAuthBridgeOptions, JwtVerifierConfig, VerifyResult } from 'deepspace/worker'
 import { integrations } from '../integrations.js'
+import { decideProxy, normalizeIntegrationName } from './integration-policy.js'
 import type { AppContext, Env } from '../../worker.js'
 
 function jwtConfig(env: Env): JwtVerifierConfig {
@@ -231,22 +232,21 @@ export function registerAuthAndIntegrationRoutes(app: Hono<AppContext>): void {
   })
 
   app.all('/api/integrations/:name/:endpoint', async (c) => {
-    const integrationName = c.req.param('name')
+    // Normalized so `Anthropic`/` FAL ` cannot dodge the (lowercase) config keys.
+    const integrationName = normalizeIntegrationName(c.req.param('name'))
     // Params arrive decoded, so `..%2F..%2Fapi%2Fusers` would otherwise
     // reach another api-worker route with the owner's token. Plain
     // identifiers only, and own keys only for the config.
     const target = integrationPath(integrationName, c.req.param('endpoint'))
     if (!target) return c.json({ error: 'Unknown integration' }, 404)
     const config = lookupOwn(integrations, integrationName)
-    const billingMode = config?.billing ?? 'developer'
 
-    // Sign-in is required unless the app opts this integration into anonymous
-    // use; developer billing would otherwise let any visitor spend the owner's
-    // credits. User billing always needs a caller to bill.
+    // DENY BY DEFAULT (see integration-policy.ts): only integrations listed in
+    // src/integrations.ts and not `serverOnly` are reachable from the browser.
     const auth = await resolveAuth(c.req.raw, c.env)
-    if (!auth && (billingMode === 'user' || !config?.anonymous)) {
-      return c.json({ error: 'Sign in required for this integration' }, 401)
-    }
+    const decision = decideProxy({ config, signedIn: !!auth })
+    if (!decision.allow) return c.json({ error: decision.error }, decision.status)
+    const billingMode = decision.billing
 
     const headers: Record<string, string> = {
       'Content-Type': c.req.header('Content-Type') ?? 'application/json',

@@ -4,16 +4,19 @@ import { createFakeTools } from './fakeTools'
 import type { FakeTools } from './fakeTools'
 
 const NOW = 1_000_000
+let seq = 0 // rooms need unique codes (the fake enforces uniqueOn like the real DO)
 
 /** A room plus one row in every child collection. */
 async function seedRoom(tools: FakeTools, expiresAt: number, extraBlanks = 0) {
-  const g = await tools.create('games', { code: 'X', hostId: 'h', expiresAt })
+  const g = await tools.create('games', { code: `X${++seq}`, hostId: 'h', expiresAt })
   if (!g.success) throw new Error('seed failed')
   const gameId = g.data.recordId
   await tools.create('memberships', { gameId, userId: 'h' })
   for (let i = 0; i < 1 + extraBlanks; i++) await tools.create('blanks', { gameId, idx: i })
   await tools.create('storyDrafts', { gameId })
   await tools.create('pages', { gameId, idx: 0 })
+  // Spend for this room: must outlive the room (see the ledger test below).
+  await tools.create('spendLedger', { kind: 'image', credits: 2, gameId, ref: 'p0-r0-a1' })
   return gameId
 }
 
@@ -38,6 +41,15 @@ describe('cleanupExpiredGames', () => {
     }
     expect(t.rows('games').map((g) => g.recordId)).toEqual([live])
     for (const c of CHILDREN) expect(count(t, c, live)).toBe(1)
+  })
+
+  it('never touches the spend ledger, so expiry cannot reset the spend', async () => {
+    const t = createFakeTools()
+    await seedRoom(t, NOW - 1)
+    await seedRoom(t, NOW - 2)
+    await cleanupExpiredGames(t, NOW, 10)
+    expect(t.rows('games')).toHaveLength(0)
+    expect(t.rows('spendLedger')).toHaveLength(2)
   })
 
   it('is idempotent: a second run changes nothing', async () => {

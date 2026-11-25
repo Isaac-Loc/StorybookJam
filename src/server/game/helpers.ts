@@ -8,11 +8,12 @@
  */
 
 import type { ActionHandler, ActionResult, ActionTools } from 'deepspace/worker'
-import type { BlankSource, GamePhase } from '../../game'
+import type { BlankSource, GamePhase, ImageStatus } from '../../game'
+import type { GameEnv } from './deps'
 import { byJoinOrder, isParamsObject } from './rules'
 
-/** Env-agnostic handler type: these actions never read env bindings. */
-export type GameAction = ActionHandler<object>
+/** Actions read only the few env bindings listed in GameEnv. */
+export type GameAction = ActionHandler<GameEnv>
 
 /**
  * Wraps an action so a malformed body (null, an array, a string...) or an
@@ -61,19 +62,30 @@ export type BlankRecord = {
   assignedTo: string
 }
 
-export type DraftRecord = { gameId: string; title: string; pages: string[] }
+/** Server-only story data for one game (no client role can read it). */
+export type DraftRecord = {
+  gameId: string
+  title: string
+  pages: string[]
+  labels: string[]
+  safety: string[][]
+  imagePrompts: string[]
+  finalPrompts: string[]
+  source: 'model' | 'fixed'
+}
 
 export type PageRecord = {
   gameId: string
   idx: number
   text: string
   imageUrl: string
-  imageStatus: string
+  imageStatus: ImageStatus
+  retries: number
   playerIds: string[]
 }
 
 /** A loaded record together with its id. */
-export type Loaded<T> = { id: string; data: T; createdAt: string }
+export type Loaded<T> = { id: string; data: T; createdAt: string; updatedAt?: string }
 
 /* Result helpers */
 
@@ -111,7 +123,7 @@ export async function listBlanks(tools: Tools, gameId: string): Promise<Loaded<B
   const r = await tools.query<BlankRecord>('blanks', { where: { gameId }, limit: QUERY_LIMIT })
   if (!r.success) return []
   return r.data.records
-    .map((x) => ({ id: x.recordId, data: x.data, createdAt: x.createdAt }))
+    .map((x) => ({ id: x.recordId, data: x.data, createdAt: x.createdAt, updatedAt: x.updatedAt }))
     .sort((a, b) => a.data.idx - b.data.idx)
 }
 
@@ -140,4 +152,20 @@ export async function findMembership(
   if (!r.success || r.data.records.length === 0) return null
   const x = r.data.records[0]
   return { id: x.recordId, data: x.data, createdAt: x.createdAt }
+}
+
+/** The story draft record for a game, or null. */
+export async function loadDraft(tools: Tools, gameId: string): Promise<Loaded<DraftRecord> | null> {
+  const r = await tools.query<DraftRecord>('storyDrafts', { where: { gameId }, limit: 1 })
+  if (!r.success || r.data.records.length === 0) return null
+  const x = r.data.records[0]
+  return { id: x.recordId, data: x.data, createdAt: x.createdAt }
+}
+
+export async function listPages(tools: Tools, gameId: string): Promise<Loaded<PageRecord>[]> {
+  const r = await tools.query<PageRecord>('pages', { where: { gameId }, limit: 50 })
+  if (!r.success) return []
+  return r.data.records
+    .map((x) => ({ id: x.recordId, data: x.data, createdAt: x.createdAt, updatedAt: x.updatedAt }))
+    .sort((a, b) => a.data.idx - b.data.idx)
 }

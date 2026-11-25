@@ -61,7 +61,7 @@ export function Lobby({ gameId, game, myId }: { gameId: string; game: GameView; 
 
       {isHost ? (
         <Button size="lg" className="w-full" data-testid="start-game" loading={starting} disabled={!canStart} onClick={start}>
-          Start the story
+          {starting ? 'Writing your story...' : 'Start the story'}
         </Button>
       ) : (
         <p className="text-sm text-muted-foreground" data-testid="waiting-for-host">

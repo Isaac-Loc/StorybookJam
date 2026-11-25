@@ -31,7 +31,9 @@ export default defineConfig({
     // Bind the local test server directly. A bare `--host` asks Vite to
     // enumerate every interface, which fails in restricted containers before
     // the app can start (`uv_interface_addresses`).
-    command: `npx vite --port ${PORT} --strictPort --host 127.0.0.1`,
+    // The helper switches story/image generation OFF so specs spend no credits
+    // (why and how: tests/helpers/generation-off.mjs).
+    command: `node tests/helpers/generation-off.mjs && npx vite --port ${PORT} --strictPort --host 127.0.0.1`,
     cwd: '..',
     // Readiness gates on the auth plane, not just vite: /api/auth/ok only
     // answers once workerd behind /api/* has booted, so no test starts

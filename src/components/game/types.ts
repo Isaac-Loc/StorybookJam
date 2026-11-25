@@ -29,4 +29,11 @@ export type BlankView = {
   assignedTo: string
 }
 
-export type PageView = { gameId: string; idx: number; text: string }
+export type PageView = {
+  gameId: string
+  idx: number
+  text: string
+  imageUrl: string
+  imageStatus: 'pending' | 'generating' | 'ready' | 'failed' | 'skipped'
+  retries: number
+}

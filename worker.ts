@@ -71,8 +71,14 @@ export class AppJobRoom extends JobRoom<Env> {
     super(state, env, {
       authorizeWrite: async (user) => {
         if (user.userId.startsWith('anon-')) return false
+        // ADMIN ONLY: the only job type (generate-images) spends the owner's
+        // credits, so ordinary members must not enqueue, cancel or flood it
+        // from the browser. Game actions enqueue server-side through
+        // `enqueueJob` (the room's internal /enqueue route), which does not go
+        // through this check, so normal play is unaffected. The app owner is
+        // an admin, which is fine. (The default read check reuses this one.)
         const role = await resolveAppRole(env, user.userId)
-        return role === 'member' || role === 'admin'
+        return role === 'admin'
       },
     })
   }
@@ -118,6 +124,8 @@ export interface Env extends DOBindings<typeof __DO_MANIFEST__> {
    * an authenticated app owner/admin. deepspace dev/test set it locally.
    */
   ALLOW_DEBUG_ROUTES?: string
+  /** Kill switch for story/image generation: only the string "false" turns it off. */
+  GENERATION_ENABLED?: string
 }
 
 export type AppContext = { Bindings: Env }

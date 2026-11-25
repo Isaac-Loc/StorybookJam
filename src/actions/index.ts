@@ -4,6 +4,7 @@ import { guarded } from '../server/game/helpers'
 import {
   createGame,
   joinGame,
+  retryPage,
   startGame,
   submitBlank,
   tick,
@@ -18,4 +19,5 @@ export const actions: Record<string, ActionHandler<Env>> = {
   submitBlank: guarded(submitBlank),
   useSafetyWord: guarded(useSafetyWord),
   tick: guarded(tick),
+  retryPage: guarded(retryPage),
 }

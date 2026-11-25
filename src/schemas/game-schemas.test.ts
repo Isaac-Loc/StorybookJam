@@ -59,4 +59,36 @@ describe('game schemas', () => {
       expect(canRead(drafts, role, draft, 'user-a'), `${role} reads a story draft`).toBe(false)
     }
   })
+
+  // The app owner is automatically an admin AND plays, so "admin can read" must
+  // be checked deliberately per collection. These hold server-only data.
+  it('no role (admin/owner included) can read or write the spend ledger or story drafts', () => {
+    for (const name of ['spendLedger', 'storyDrafts']) {
+      const c = schemas.find((s) => s.name === name)!
+      const row = { data: { gameId: 'g1' }, createdBy: 'user-a' }
+      for (const role of ['member', 'admin', 'viewer', '*']) {
+        expect(canRead(c, role, row, 'user-a'), `${role} reads ${name}`).toBe(false)
+        expect(c.permissions[role]).toMatchObject({ create: false, update: false, delete: false })
+      }
+    }
+  })
+
+  it('pages: players (and admin) read them; the image status is a declared select', () => {
+    const pages = schemas.find((s) => s.name === 'pages')!
+    const row = { data: { playerIds: ['user-a'] }, createdBy: 'server' }
+    expect(canRead(pages, 'member', row, 'user-a')).toBe(true)
+    expect(canRead(pages, 'member', row, 'outsider')).toBe(false)
+    const status = pages.columns.find((c) => c.name === 'imageStatus')!
+    expect(status.interpretation).toEqual({
+      kind: 'select',
+      options: ['pending', 'generating', 'ready', 'failed', 'skipped'],
+    })
+    expect(pages.columns.find((c) => c.name === 'retries')).toMatchObject({ storage: 'number', default: 0 })
+  })
+
+  it('games.phase still declares the later phases', () => {
+    const games = schemas.find((s) => s.name === 'games')!
+    const phase = games.columns.find((c) => c.name === 'phase')!.interpretation as { options: string[] }
+    for (const p of ['lobby', 'filling', 'generating', 'ready', 'failed', 'revealed']) expect(phase.options).toContain(p)
+  })
 })

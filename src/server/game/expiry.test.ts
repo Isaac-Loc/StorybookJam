@@ -12,7 +12,7 @@ import type { FakeTools } from './fakeTools'
 import type { GameAction } from './helpers'
 
 const run = (h: GameAction, userId: string, tools: FakeTools, params: Record<string, unknown>) =>
-  h({ userId, params, tools, env: {}, callerJwt: '' })
+  h({ userId, params, tools, env: { DEEPSPACE_APP_ID: 'app', JOB_ROOMS: undefined as never, GENERATION_ENABLED: 'false' }, callerJwt: '' })
 
 async function expiredRoom() {
   const tools = createFakeTools('host')

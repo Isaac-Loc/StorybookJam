@@ -11,7 +11,7 @@
  */
 
 import type { CollectionSchema, RolePermissions } from 'deepspace/schema'
-import { GAME_PHASES } from '../game'
+import { GAME_PHASES, IMAGE_STATUSES } from '../game'
 
 const NONE: RolePermissions = { read: false, create: false, update: false, delete: false }
 
@@ -105,7 +105,16 @@ export const blanksSchema: CollectionSchema = {
  */
 export const storyDraftsSchema: CollectionSchema = {
   name: 'storyDrafts',
-  columns: [text('gameId'), text('title'), { name: 'pages', storage: 'text', interpretation: { kind: 'json' }, default: [] }],
+  columns: [
+    text('gameId'),
+    text('title'),
+    json('pages', []), // page TEXT templates with {0}..{5}
+    json('labels', []), // 6 blank labels (also copied onto the blanks rows)
+    json('safety', []), // 6 lists of safety words, one list per blank
+    json('imagePrompts', []), // template image prompts (placeholders, never player text)
+    json('finalPrompts', []), // moderated, player-word-filled prompts that fal actually sees
+    text('source', { default: 'fixed' }), // 'model' | 'fixed'
+  ],
   uniqueOn: ['gameId'],
   permissions: {
     '*': NONE,
@@ -123,7 +132,13 @@ export const pagesSchema: CollectionSchema = {
     num('idx'),
     text('text'),
     text('imageUrl', { default: '' }),
-    text('imageStatus', { default: 'none' }),
+    {
+      name: 'imageStatus',
+      storage: 'text',
+      interpretation: { kind: 'select', options: [...IMAGE_STATUSES] },
+      default: 'pending',
+    },
+    num('retries'), // manual retries used (max MAX_PAGE_RETRIES)
     json('playerIds', []), // copy of the game's players: what `shared` read checks
   ],
   uniqueOn: ['gameId', 'idx'],
@@ -136,10 +151,31 @@ export const pagesSchema: CollectionSchema = {
   },
 }
 
+/**
+ * Append-only record of ESTIMATED generation spend (see budget.ts). Server
+ * only: no role can read or write it, admin and app owner included. It is
+ * deliberately NOT swept by room cleanup, so a room expiring never resets the
+ * spend. uniqueOn (gameId, kind, ref) makes each reservation idempotent and
+ * doubles as a once-per-game claim for the story and polish calls.
+ */
+export const spendLedgerSchema: CollectionSchema = {
+  name: 'spendLedger',
+  columns: [
+    { name: 'kind', storage: 'text', interpretation: { kind: 'select', options: ['llm-story', 'llm-final', 'image'] } },
+    num('credits'),
+    text('gameId'),
+    text('userId'), // the room's HOST, for the per-host sub-cap
+    text('ref'),
+  ],
+  uniqueOn: ['gameId', 'kind', 'ref'],
+  permissions: { '*': NONE, viewer: NONE, member: NONE, admin: NONE },
+}
+
 export const gameSchemas: CollectionSchema[] = [
   gamesSchema,
   membershipsSchema,
   blanksSchema,
   storyDraftsSchema,
   pagesSchema,
+  spendLedgerSchema,
 ]
