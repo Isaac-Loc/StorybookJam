@@ -14,13 +14,15 @@ change behavior, limits or decisions, update the relevant section.
 
 ## 0. Resume here (state snapshot, 2026-11-24 about 8:15 PM ET)
 
-Last deployed: release #5, the commit that added the landing-page sample book,
-the new README and the submission-note draft (look up its hash with
-`npx deepspace releases`). The game itself is unchanged since release #4
-(commit 9b21f66), on which the developer played a full round with illustrations
-live. At this snapshot the deployed app and the repo head are the same commit
-and nothing is uncommitted. All build work is done; what remains is the
-developer's own review of the note and the final cleanup below.
+The deployed app was redeployed from the repo head at this snapshot (verify:
+the latest entry of `npx deepspace releases` should show the same commit as
+`git rev-parse --short HEAD`), and nothing is uncommitted. The game itself is
+unchanged since release #4 (commit 9b21f66), on which the developer played a
+full round with illustrations live. The last app-affecting change added the
+landing-page sample book (commit e9fd4d7, release #5); later commits only
+touch docs, and each docs fix was redeployed, which is why release numbers keep
+moving: do not hard-code release numbers in this file. All build work is done;
+what remains is the developer's own review of the note and the cleanup below.
 
 First five minutes in a new session (read-only, free):
 ```bash
@@ -101,7 +103,8 @@ Done and live (release history from `npx deepspace releases`):
 | #2 | a299c84 | Slice 1: rooms, join codes, hidden blanks, timer, safety words, fixed story; room-creation rate limits; 2-hour expiry + cleanup |
 | #3 | e322803 | Fix: the app owner is auto-`admin`; admin must be able to read their OWN blanks |
 | #4 | 9b21f66 | Slice 2: model-written story, safety rewrite, 4 illustrations, spend ledger and caps, kill switch, deny-by-default integration proxy |
-| #5 | (see `npx deepspace releases`) | Landing page sample book, rewritten README, submission-note draft |
+| #5 | e9fd4d7 | Landing page sample book, rewritten README, submission-note draft |
+| later | docs only | Handoff corrections, each redeployed so the live app matches the repo head |
 
 Remaining, in priority order:
 1. The developer reviews `docs/SUBMISSION_NOTE.md` and resolves its `[CONFIRM]` lines.
@@ -386,7 +389,7 @@ file. So:
   full-round verified by the developer, handoff docs written and committed.
   Mid-flight: nothing.
 - 2026-11-24 (ET, about 8:15 PM): landing sample book, README rewrite and
-  submission-note draft added and deployed as release #5; handoff prepared for
+  submission-note draft added and deployed (commit e9fd4d7); handoff prepared for
   continuing in another agent tool (Codex). Mid-flight: nothing; remaining work
   is the developer's review of the note, the final live round, test-account
   cleanup and submitting.
