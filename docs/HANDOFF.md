@@ -12,12 +12,15 @@ change behavior, limits or decisions, update the relevant section.
   DeepSpace. Deadline was 2026-11-24 23:59 ET. The submission is the live URL,
   the repo and a short written note (see "Writeup" below).
 
-## 0. Resume here (state snapshot, 2026-11-24 about 8:30 PM ET)
+## 0. Resume here (state snapshot, 2026-11-24 about 9:00 PM ET)
 
-Last deployed: release #4, commit 9b21f66 (live and working: a full round with
-illustrations was played by the developer on the live site). Commits after it
-are documentation only (this file, CLAUDE.md, the AGENTS.md pointer), so the
-deployed app and the repo head differ only in docs. Nothing is uncommitted.
+Last deployed: release #5, the commit that added the landing-page sample book,
+the new README and the submission-note draft (look up its hash with
+`npx deepspace releases`). The game itself is unchanged since release #4
+(commit 9b21f66), on which the developer played a full round with illustrations
+live. At this snapshot the deployed app and the repo head are the same commit
+and nothing is uncommitted. All build work is done; what remains is the
+developer's own review of the note and the final cleanup below.
 
 First five minutes in a new session (read-only, free):
 ```bash
@@ -31,18 +34,15 @@ at `~/.deepspace/session` (it acts as the developer; never print or copy it).
 Ask the developer to run it or to approve it rather than working around it.
 
 Next actions, in order (see section 3 for the table):
-1. **Landing sample book.** Generate ONE real game (about 5 to 8 credits: ask the
-   developer first), save the 4 page texts and the 4 images as committed static
-   assets (for example `public/sample/`), and show them as a static section in
-   `src/pages/index.tsx`. That page is static and prerendered: no hooks, no
-   auth, no `window`/`document` during render. No generation calls from the
-   landing page.
-2. **README.** Replace the stale "Where it stands" and "Planned features" in
-   `README.md` with the real features, the spend caps and kill switch, and a
-   link to this file.
-3. **Submission note.** Draft it as `docs/SUBMISSION_NOTE.md` for the developer
-   to paste into the portal (see section 10). Use measured numbers only; leave
-   clearly marked blanks for things only the developer can attest to.
+1. DONE: landing sample book. `public/sample/page-1..4.jpg` plus a static
+   section in `src/pages/index.tsx` (hand-written story "Pip and the Giant
+   Spatula", pictures made with the same fal model, size and style as the app;
+   the landing page itself never calls a model). The four images cost about 5.6
+   credits, and one page was regenerated (about 1.4 more).
+2. DONE: `README.md` rewritten with the real features, caps and kill switch.
+3. DONE (draft): `docs/SUBMISSION_NOTE.md`. The developer must read it, edit it
+   into their own voice, resolve the `[CONFIRM]` lines, and paste it into the
+   portal. Re-check any number before changing it.
 4. **Final live check.** One more full live round; confirm that the latest
    release commit in `npx deepspace releases` is the latest commit that changed
    app code (`git log` shows which later commits are docs-only), and that GitHub
@@ -86,7 +86,7 @@ prompts. Preserve that property in every change.
 | Reveal | Automatic when the last blank is filled |
 | Tone / art | Silly and absurd; one fixed art style (`ART_STYLE` in `src/game.ts`) |
 | Length | 4 pages |
-| Sharing | No public books. A static pre-made sample on the landing page is planned (slice 3) |
+| Sharing | No public books. A static pre-made sample book is on the landing page (`public/sample/`) |
 | Room lifetime | 2 hours, then deleted (cron + opportunistic cleanup) |
 | Spend | Generation is developer-billed. App-side cap 400 estimated credits globally, 120 per host; 100 credits kept for development testing |
 | Integrations | `anthropic` and `fal` only. No narration/audio, no video (video was too expensive: fal compute-priced runs reserve $2) |
@@ -101,16 +101,15 @@ Done and live (release history from `npx deepspace releases`):
 | #2 | a299c84 | Slice 1: rooms, join codes, hidden blanks, timer, safety words, fixed story; room-creation rate limits; 2-hour expiry + cleanup |
 | #3 | e322803 | Fix: the app owner is auto-`admin`; admin must be able to read their OWN blanks |
 | #4 | 9b21f66 | Slice 2: model-written story, safety rewrite, 4 illustrations, spend ledger and caps, kill switch, deny-by-default integration proxy |
+| #5 | (see `npx deepspace releases`) | Landing page sample book, rewritten README, submission-note draft |
 
-Remaining (slice 3 and wrap-up), in priority order:
-1. Final verification: play a full live round, read real cost with
-   `npx deepspace app usage --json`, record the measured credits per game.
-2. Landing page sample book (static, pre-generated, committed assets) so
-   visitors see output without spending credits.
-3. Update `README.md` (its "Where it stands" / "Planned features" are stale).
-4. Write the submission note (see Writeup).
-5. Delete the two test accounts at the very end (ask the user first).
-6. Optional hardening listed in "Known gaps".
+Remaining, in priority order:
+1. The developer reviews `docs/SUBMISSION_NOTE.md` and resolves its `[CONFIRM]` lines.
+2. One last live round by the developer; read real cost with
+   `npx deepspace app usage --json` and update the note's numbers if needed.
+3. Delete the two test accounts at the very end (ask the user first).
+4. Submit in the portal (live URL, repo URL, note).
+5. Optional hardening listed in "Known gaps".
 
 ## 4. Architecture
 
@@ -215,6 +214,8 @@ src/pages/(app)/(protected)/home.tsx, game/[code].tsx   client pages
 src/components/game/           Lobby, JoinRoom, Filling, Revealed
 tests/game.spec.ts             two-account Playwright spec
 tests/helpers/generation-off.mjs   turns generation off for e2e
+public/sample/page-1..4.jpg    landing-page sample illustrations (committed assets)
+docs/SUBMISSION_NOTE.md        draft of the portal writeup (developer edits it)
 ```
 
 ## 5. Hard-won platform lessons
@@ -383,5 +384,9 @@ file. So:
   rate limits, 2-hour expiry), owner-admin fix, slice 2 (model story, safety
   rewrite, images, spend ledger, kill switch, deny-by-default proxy), live
   full-round verified by the developer, handoff docs written and committed.
-  Mid-flight: nothing; slice 3 (landing sample, README) and the submission
-  note are not started.
+  Mid-flight: nothing.
+- 2026-11-24 (ET, about 9 PM): landing sample book, README rewrite and
+  submission-note draft added and deployed as release #5; handoff prepared for
+  continuing in another agent tool (Codex). Mid-flight: nothing; remaining work
+  is the developer's review of the note, the final live round, test-account
+  cleanup and submitting.

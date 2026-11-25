@@ -7,39 +7,45 @@ Try it: https://storybookjam.app.space
 
 ## How a round works
 
-1. The host opens a room and shares its code.
-2. The app drafts a short story with blanks in it, then hands each blank to a
-   different player. You see only your own label ("an animal", "a place",
-   "something scary"), never the surrounding text.
-3. When every blank is filled, the story is revealed with everyone's words in
-   it, and each page gets an illustration.
-4. The finished book opens in a reader and gets a link you can share.
+1. A signed-in host opens a room and shares its 5-letter code (up to 6 players;
+   playing solo works too).
+2. Claude writes a short, silly four-page story with six blanks. Each blank is
+   secretly dealt to a player. You see only your own labels ("an animal", "a
+   place"), never the surrounding story.
+3. A 75-second timer runs. Stuck? Tap "Use a safety word". When time runs out
+   the server fills whatever is left.
+4. When every blank is filled, a second model pass swaps any harmful word for a
+   harmless one, and four illustrations are generated page by page.
+5. Rooms expire after two hours and are deleted. Nothing is made public.
 
-The point of the design is that the hidden part is hidden on the server, not
-just in the interface: a player's browser never receives words it isn't
-supposed to see.
+The design point: the hidden part is hidden on the server, not just in the
+interface. A player's browser never receives words, story text or image prompts
+it isn't supposed to see.
 
-## Where it stands
+## Built with
 
-Work in progress. The app is scaffolded and deployed. Rooms, the fill-in
-round and story generation are being built, and this section gets updated as
-each one lands.
+- DeepSpace: hosting, sign-in, synced records with per-row permissions, server
+  actions, a background job room for image generation, and a cron task that
+  deletes expired rooms.
+- `anthropic` (story draft and safety rewrite) and `fal` (page illustrations),
+  called only from the server through DeepSpace's integration layer.
+- Spend controls: a server-only ledger caps estimated generation spend
+  globally and per host, a kill switch turns generation off, and the browser
+  can't reach paid integrations directly. Without generation the game falls
+  back to a fixed story and text only.
 
-## What it runs on
+More detail for contributors and agents: [docs/HANDOFF.md](./docs/HANDOFF.md).
 
-- DeepSpace for hosting, sign-in, synced room data and permissions
-- A language model for the story draft, called through DeepSpace's
-  integration layer
-- An image model for the page art, through the same layer
-- A spend counter that stops generation when the budget is used up, so the
-  app degrades instead of failing
-
-## Run it locally
+## Development
 
 ```bash
 npm install
 npm run dev
 ```
+
+Checks before a commit: `npm run type-check && npm run lint && npm run test:unit && npm run build`.
+End-to-end tests (`npx deepspace test run tests/game.spec.ts`) run with image
+generation switched off so they cost nothing.
 
 ## Ship it
 
