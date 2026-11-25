@@ -9,7 +9,7 @@ import { BookOpen, ChevronLeft, ChevronRight, Headphones, Pause } from 'lucide-r
 import { useQuery } from 'deepspace'
 import { Button, useToast } from '@/components/ui'
 import { callAction } from '@/lib/callAction'
-import { MAX_PAGE_RETRIES, PAGE_COUNT, pageMediaInFlight } from '../../game'
+import { MAX_PAGE_RETRIES, pageMediaInFlight, storyPageCount } from '../../game'
 import type { GamePhase } from '../../game'
 import type { PageView } from './types'
 import { getStoryTheme, type StoryThemeId } from '../../story-themes'
@@ -21,7 +21,7 @@ const SWEEP_NUDGE_MS = 30_000
 const MIN_READ_MS = 4_000
 const READ_MS_PER_CHARACTER = 65
 
-type StoryProps = { gameId: string; title: string; phase: GamePhase; storyTheme?: StoryThemeId }
+type StoryProps = { gameId: string; title: string; phase: GamePhase; storyTheme?: StoryThemeId; pageCount?: number }
 
 export function Revealed(props: StoryProps) {
   return <StorySlideshow key={props.gameId} {...props} />
@@ -29,13 +29,14 @@ export function Revealed(props: StoryProps) {
 
 type Clip = { idx: number; audioUrl: string }
 
-function StorySlideshow({ gameId, title, phase, storyTheme }: StoryProps) {
+function StorySlideshow({ gameId, title, phase, storyTheme, pageCount }: StoryProps) {
   const theme = getStoryTheme(storyTheme)
+  const totalPages = storyPageCount(pageCount)
   const { records, status } = useQuery<PageView>('pages', { where: { gameId } })
   const pages = [...records].sort((a, b) => a.data.idx - b.data.idx)
   const drawable = pages.filter((p) => p.data.imageStatus !== 'skipped').length
   const ready = pages.filter((p) => p.data.imageStatus === 'ready').length
-  const bookReady = phase === 'ready' && pages.length === PAGE_COUNT && !pages.some(({ data }) => pageMediaInFlight(data))
+  const bookReady = phase === 'ready' && pages.length === totalPages && !pages.some(({ data }) => pageMediaInFlight(data))
   const hasNarration = pages.some(({ data }) => data.narrationStatus === 'ready')
   const [clips, setClips] = useState<Clip[] | null>(null)
   const [clipLoad, setClipLoad] = useState(0)
@@ -110,14 +111,14 @@ function StorySlideshow({ gameId, title, phase, storyTheme }: StoryProps) {
   const advance = useCallback(() => {
     if (!playing) return
     const next = active + 1
-    if (next >= PAGE_COUNT) {
+    if (next >= totalPages) {
       setPlaying(false)
       return
     }
     setActive(next)
     const nextClip = clips?.find(({ idx }) => idx === next)
     startPlayback(nextClip?.audioUrl, next)
-  }, [playing, active, clips, startPlayback])
+  }, [playing, active, clips, startPlayback, totalPages])
 
   useEffect(() => {
     if (!playing || !silentPage) return
@@ -149,7 +150,7 @@ function StorySlideshow({ gameId, title, phase, storyTheme }: StoryProps) {
       ) : (
         <section aria-label="Story pages" className="jam-stage space-y-4 p-3 sm:p-4">
           {pages.map((p) => (
-            <PageCard key={p.recordId} gameId={gameId} page={p.data} theme={theme.id} hidden={p.data.idx !== active} />
+            <PageCard key={p.recordId} gameId={gameId} page={p.data} theme={theme.id} totalPages={totalPages} hidden={p.data.idx !== active} />
           ))}
           <div className="flex flex-wrap items-center justify-center gap-2" aria-label="Page navigation">
             <Button variant="outline" aria-label="Previous" disabled={!pages.some(({ data }) => data.idx === active - 1)} onClick={() => goTo(active - 1)}><ChevronLeft aria-hidden /><span className="hidden sm:inline">Previous</span></Button>
@@ -210,13 +211,19 @@ function StorySlideshow({ gameId, title, phase, storyTheme }: StoryProps) {
   )
 }
 
-function PageCard({ gameId, page, theme, hidden }: { gameId: string; page: PageView; theme: StoryThemeId; hidden: boolean }) {
+function PageCard({ gameId, page, theme, totalPages, hidden }: {
+  gameId: string
+  page: PageView
+  theme: StoryThemeId
+  totalPages: number
+  hidden: boolean
+}) {
   return (
     <article hidden={hidden} className="jam-story-page rounded-lg border border-border" data-testid="story-page">
       <Illustration gameId={gameId} page={page} theme={theme} />
       <div className="flex min-w-0 flex-col justify-center p-5 sm:p-7">
         <p className="jam-eyebrow mb-3">
-          Page {page.idx + 1} of {PAGE_COUNT}
+          Page {page.idx + 1} of {totalPages}
         </p>
         <p className="jam-story-copy leading-relaxed break-words">{page.text}</p>
       </div>

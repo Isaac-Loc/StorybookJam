@@ -61,7 +61,7 @@ export async function polishStory(
   words: readonly string[],
 ): Promise<PolishedPage[] | null> {
   const text = await askClaude(tools, POLISH_SYSTEM, polishUserPrompt(draft, words), POLISH_MAX_TOKENS)
-  const pages = validatePolished(parseModelJson(text))?.pages ?? null
+  const pages = validatePolished(parseModelJson(text), draft.pages.length)?.pages ?? null
   // A word replaced in the text but still in an image prompt must never reach fal.
   return pages && !leaksReplacedWord(pages, words) ? pages : null
 }

@@ -71,9 +71,15 @@ export const MAX_PAGE_RETRIES = 2
 /** Default style for Silly Surprise and rooms saved before themes existed. */
 export const ART_STYLE = STORY_THEMES[0].artStyle
 
-export const PAGE_COUNT = 4
-/** At most 600 characters across four separately narrated pages. */
+export const LEGACY_PAGE_COUNT = 4
+export const PAGE_COUNT = 6
+/** At most 900 characters across six separately narrated pages. */
 export const PAGE_TEXT_MAX = 150
+
+/** Older rooms have no stored page count. */
+export function storyPageCount(value?: number): number {
+  return value === PAGE_COUNT ? PAGE_COUNT : LEGACY_PAGE_COUNT
+}
 
 export const IMAGE_STATUSES = ['pending', 'generating', 'ready', 'failed', 'skipped'] as const
 export type ImageStatus = (typeof IMAGE_STATUSES)[number]
@@ -124,14 +130,16 @@ export const BLANK_SPECS: readonly BlankSpec[] = [
 export const STORY_TITLE = 'Gerald and the Giant Problem'
 
 /**
- * Four page templates. `{0}`..`{5}` are replaced with the value of the blank
+ * Page templates. `{0}`..`{5}` are replaced with the value of the blank
  * at that index (see BLANK_SPECS). Indexes are story slots, not player slots.
  */
 export const STORY_PAGES: readonly string[] = [
   'In {2} lived a {1} {0} named Gerald. His favorite food was {3}.',
   'A strange noise woke Gerald. A giant {4} sat in the garden, shouting “{5}!”',
+  'Gerald put on his slippers and tiptoed outside. The giant had swallowed his favorite garden chair.',
   'Gerald pushed the giant {4}, but it only grew. “A bite of {3} might help,” he said.',
-  'The giant took a bite and smiled. It floated gently into the sky, leaving Gerald to finish breakfast.',
+  'The giant took a bite and smiled. Then it sneezed, and the missing chair landed right beside Gerald.',
+  'The giant floated gently into the sky. Gerald sat down to finish breakfast, and the garden was quiet at last.',
 ]
 
 /* ------------------------------------------------------------------ */

@@ -3,6 +3,7 @@
  * prompt-injection fence. Fake tools only, no real calls.
  */
 import { describe, expect, it } from 'vitest'
+import { PAGE_COUNT } from '../../game'
 import { startGame } from './actions'
 import type { GenDeps } from './deps'
 import { createFakeTools } from './fakeTools'
@@ -59,7 +60,7 @@ describe('leaksReplacedWord', () => {
     t.onIntegration(() => claudeReply(leaky))
     const d = deps()
     await reveal(t, gameId, d)
-    expect(t.rows('pages').map((p) => p.data.imageStatus)).toEqual(['skipped', 'skipped', 'skipped', 'skipped'])
+    expect(t.rows('pages').map((p) => p.data.imageStatus)).toEqual(Array(PAGE_COUNT).fill('skipped'))
     expect(d.queued).toHaveLength(0)
   })
 })
@@ -73,7 +74,7 @@ describe('reveal recovery', () => {
     t.onIntegration(() => claudeReply(modelPolishJson())) // would be used if (wrongly) called again
     await reveal(t, gameId, deps())
     expect(t.integrationCalls).toHaveLength(0) // no second paid call
-    expect(t.rows('pages').map((p) => p.data.imageStatus)).toEqual(['skipped', 'skipped', 'skipped', 'skipped'])
+    expect(t.rows('pages').map((p) => p.data.imageStatus)).toEqual(Array(PAGE_COUNT).fill('skipped'))
     expect(t.rows('games')[0].data.phase).toBe('ready')
   })
 
@@ -94,8 +95,8 @@ describe('reveal recovery', () => {
     t.rows('spendLedger')[0].createdAt = old(61_000)
     const d = deps()
     await reveal(t, gameId, d)
-    expect(t.rows('pages')).toHaveLength(4)
-    expect(t.rows('pages').map((p) => p.data.imageStatus)).toEqual(['pending', 'pending', 'skipped', 'skipped'])
+    expect(t.rows('pages')).toHaveLength(PAGE_COUNT)
+    expect(t.rows('pages').map((p) => p.data.imageStatus)).toEqual(['pending', 'pending', ...Array(PAGE_COUNT - 2).fill('skipped')])
     expect(t.rows('pages')[0].data.text).toBe('page 0') // existing rows untouched
     expect(t.rows('games')[0].data.phase).toBe('generating')
     expect(d.queued).toEqual([gameId])
@@ -110,7 +111,7 @@ describe('reveal recovery', () => {
     expect(t.rows('games')[0].data.phase).toBe('filling')
     t.rows('spendLedger')[0].createdAt = old(61_000)
     await reveal(t, gameId, deps()) // stale now: completes
-    expect(t.rows('pages')).toHaveLength(4)
+    expect(t.rows('pages')).toHaveLength(PAGE_COUNT)
     expect(t.rows('games')[0].data.phase).toBe('ready')
   })
 })

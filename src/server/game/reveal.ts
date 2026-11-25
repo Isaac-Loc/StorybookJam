@@ -177,6 +177,7 @@ export async function reveal(tools: Tools, gameId: string, deps: GenDeps): Promi
   await tools.update<GameRecord>('games', gameId, {
     phase: anyPending ? 'generating' : 'ready',
     title: draft.data.title,
+    pageCount: pageTexts.length,
   })
 
   if (anyPending) {

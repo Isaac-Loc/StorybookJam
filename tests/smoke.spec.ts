@@ -26,6 +26,9 @@ test.describe('Smoke tests', () => {
     await expect(page.getByRole('heading', { name: 'Silly Surprise' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Space Trouble' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Tiny Quest' })).toBeVisible()
+    const sampleAudio = page.locator('audio[aria-labelledby="sample-audio-label"]')
+    await expect(sampleAudio).toHaveAttribute('src', /^\/[^:]+sample-narration[^/]*\.mp3$/)
+    await expect(sampleAudio).toHaveAttribute('preload', 'none')
     expect(errors).toEqual([])
   })
 

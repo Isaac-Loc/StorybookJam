@@ -14,11 +14,11 @@ change behavior, limits or decisions, update the relevant section.
 
 ## 0. Resume here (state snapshot, 2026-11-24 ET)
 
-The last verified live commit and GitHub `dev` head were `7b36c0e`, which
-added narration, a slideshow, and player progress. This checkout revamps the
-frontend and adds host-selected story themes. Verify deployment by comparing
-`npx deepspace releases` with `git rev-parse --short HEAD`. Live voice playback
-and settled narration cost remain unverified without an approved paid run.
+The last verified live release and GitHub `dev` head were at `b2f8e77`, which
+shipped the redesigned frontend and host-selected themes. This checkout adds
+six-page rounds and bundled sample narration. Verify deployment by comparing
+`npx deepspace releases` with `git rev-parse --short HEAD`. Sample narration
+and its one-time charge are verified. A live six-page round is unverified.
 
 First five minutes in a new session (read-only, free):
 ```bash
@@ -64,13 +64,13 @@ not required for anything in this repo.
 
 A multiplayer Mad-Libs picture book. A signed-in host creates a room (5-letter
 code). Up to 6 players join. The host picks a story theme in the lobby.
-A language model writes a four-page story in that theme with 6 blanks; each
+A language model writes a six-page story in that theme with 6 blanks; each
 blank is secretly dealt to a player, who sees only that
 blank's label ("an animal") and never the story. A 75-second timer runs; a
 player can tap "Use a safety word" and the server fills anything left when time
 runs out. A checkmark shows when a player has filled all their own blanks.
 When every blank is filled, a second model call rewrites harmful player words,
-then four illustrations and four narration clips are generated. The book
+then an illustration and narration clip are generated for each page. The book
 attempts playback when ready and turns a page when its clip ends. Rooms expire
 after 2 hours and are deleted. There are no public books.
 
@@ -89,8 +89,8 @@ prompts. Preserve that property in every change.
 | Safety words | Per-blank safety words from the story draft; used on tap or when the timer expires |
 | Reveal | Automatic when the last blank is filled. The slideshow tries autoplay and offers manual play and page controls |
 | Tone / art | The host chooses Silly Surprise (default, bright watercolor), Space Trouble (retro space comic), or Tiny Quest (cut-paper backyard adventure). The theme guides the story, blank prompts, illustration style, and book accents. |
-| Length | 4 pages, at most 150 characters per page and 600 across the four page bodies |
-| Sharing | No public books. A static pre-made sample book is on the landing page (`public/sample/`) |
+| Length | New rounds have 6 pages, at most 150 characters per page and 900 across the page bodies. Existing 4-page rounds remain readable and can finish. |
+| Sharing | No public player books. The landing page has a four-page sample book (`public/sample/`) and a bundled recording (`src/assets/sample-narration.mp3`). Playing it makes no integration calls. |
 | Room lifetime | 2 hours, then deleted (cron + opportunistic cleanup) |
 | Spend | Generation is developer-billed. App-side cap 400 estimated credits globally, 120 per host; 100 credits kept for development testing |
 | Integrations | `anthropic`, `fal`, and `elevenlabs`. No video (fal compute-priced runs reserve $2) |
@@ -108,10 +108,10 @@ Done and live (release history from `npx deepspace releases`):
 | #5 | e9fd4d7 | Landing page sample book, rewritten README, submission-note draft |
 | later | docs only | Handoff corrections, each redeployed so the live app matches the repo head |
 | later | 7b36c0e | Narrated slideshow and player completion checkmarks |
+| later | b2f8e77 | Redesigned frontend and host-selected story themes |
 
-This checkout adds the new visual design and host theme selection. The
-landing page showcases all three story worlds using existing sample art and
-CSS artwork. Use `npx deepspace releases` to verify the currently live commit.
+This checkout adds the saved sample narration and six-page stories for new
+rounds. Use `npx deepspace releases` to verify the currently live commit.
 
 Remaining, in priority order:
 1. The developer reviews `docs/SUBMISSION_NOTE.md` and resolves its `[CONFIRM]` lines.
@@ -130,7 +130,7 @@ on any game collection (admin may delete `games`, `memberships` and `pages`).
 
 | Collection | Holds | Who can read |
 |---|---|---|
-| `games` | code, hostId, phase, lobbyTheme, storyTheme, playerIds, playerNames, phaseEndsAt, expiresAt, filledCount, finishedPlayerIds, totalBlanks, title | members who are in `playerIds` (`read: 'shared'`), admin all |
+| `games` | code, hostId, phase, lobbyTheme, storyTheme, playerIds, playerNames, phaseEndsAt, expiresAt, filledCount, finishedPlayerIds, totalBlanks, pageCount, title | members who are in `playerIds` (`read: 'shared'`), admin all |
 | `memberships` | gameId, userId, name (the authoritative roster; unique per game+user) | own row; admin all |
 | `blanks` | label, value, filled, source, assignedTo | ONLY the assignee (`ownerField: assignedTo`, `read: 'own'` for member AND admin) |
 | `storyDrafts` | drafted template, safety words, image prompts, `finalPrompts` | NO role (server only). Its `uniqueOn gameId` doubles as the "start claimed" lock |
@@ -164,7 +164,7 @@ exact transitions.
    selection. Missing theme fields fall back to Silly Surprise. One Claude
    call drafts the story from trusted theme instructions, with a matching fixed
    story on failure, over budget, or when generation is off. It creates 6
-   blanks and writes `storyTheme` with the transition to filling. Late lobby
+   blanks and writes `storyTheme` and `pageCount` with the transition to filling. Late lobby
    writes cannot change that locked theme. The timer starts after blanks exist.
    Stale-claim recovery runs after 60 s.
 4. `submitBlank` / `useSafetyWord`: caller must own the blank and be a current
@@ -182,7 +182,8 @@ exact transitions.
    enqueued. If the polish call fails or the cap is hit, pages are text-only
    and images and narration are `skipped`. Only polished output goes to fal
    and ElevenLabs. Draft templates must fit after the longest valid
-   substitutions, and polished pages are also length checked.
+   substitutions, and polished pages are also length checked. The draft's
+   length lets an in-progress four-page round finish with its original size.
 7. Media job `generate-images` (`src/jobs.ts`, `src/server/game/images.ts`,
    `AppJobRoom` in `worker.ts`): per page `fal/run-model` then poll
    `fal/get-result`; one auto-retry; deadlines and abort handling; marks pages
@@ -219,10 +220,13 @@ also refuses an expired room immediately. Verify with
 Cost facts (100 credits = US$1; account is on the free tier with a 500-credit
 allowance): one image is billed up to 2.0 credits (0.005 x ~4x platform markup;
 fal itself reports ~$0.003); a prior game without narration was roughly 5 to 8
-credits. Narration adds an estimated maximum of 3 credits per page and 12 per
-story, based on the catalog price and validated character limits. Each request
-contains just that page's body, with no header or separator. The actual
-narration cost is unverified without a paid run. The ledger
+credits. Narration adds an estimated maximum of 3 credits per page and 18 per
+six-page story. Each request contains just that page's body, with no title or
+separator. With the two story calls and first attempts at all illustrations
+and clips, the ledger reserves 35 credits for a six-page round. Retries may
+add image costs. A live six-page round has not been measured. The sample's
+543-character combined recording cost 10.86 credits once. Serving the saved
+MP3 does not call ElevenLabs. The ledger
 estimates are `COST_ESTIMATE_CREDITS` in `src/game.ts`. The ledger is
 race-free: write the reservation row first, sum, delete your own row if over
 the cap. Real spend: `npx deepspace app usage --json`.
@@ -254,6 +258,7 @@ src/components/game/           Lobby, JoinRoom, Filling, Revealed
 tests/game.spec.ts             two-account Playwright spec
 tests/helpers/generation-off.mjs   turns generation off for e2e
 public/sample/page-1..4.jpg    landing-page sample illustrations (committed assets)
+src/assets/sample-narration.mp3  bundled landing-page sample recording
 docs/SUBMISSION_NOTE.md        draft of the portal writeup (developer edits it)
 ```
 
@@ -438,3 +443,7 @@ file. So:
 - 2026-11-24 (ET, evening): rebuilt the frontend around the three story
   worlds and added host theme selection. Verified the local production landing
   at desktop and phone sizes and the two-player theme flow with generation off.
+- 2026-11-24 (ET, evening): generated the landing sample's recording once
+  for 10.86 credits and verified browser playback from the saved MP3. Expanded
+  new rounds to six pages, with four-page compatibility covered by unit tests
+  and six-page navigation verified in the two-player browser test.

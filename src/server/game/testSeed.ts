@@ -1,5 +1,6 @@
 /** Test helpers: seed games/blanks/drafts/pages into a fake tools object. Unit tests only. */
 
+import { PAGE_COUNT } from '../../game'
 import type { FakeTools } from './fakeTools'
 import type { GameAction } from './helpers'
 import type { GameEnv } from './deps'
@@ -94,12 +95,14 @@ export function modelStoryJson() {
       { text: 'Pip loved {3} more than anything.', imagePrompt: 'Pip eating {3}' },
       { text: 'One day a {4} went {5}!', imagePrompt: 'Pip surprised by a {4}' },
       { text: 'Pip waved goodbye to the {4}.', imagePrompt: 'Pip waving at a {4}, {5} sound lines' },
+      { text: 'Pip set out a picnic for the neighbors.', imagePrompt: 'Pip carrying a picnic basket' },
+      { text: 'They laughed until the stars came out.', imagePrompt: 'Pip and neighbors beneath the stars' },
     ],
   }
 }
 
-export const modelPolishJson = (rewritten = false) => ({
-  pages: [0, 1, 2, 3].map((i) => ({ text: `Final text ${i}.`, imagePrompt: `Pip scene ${i}, friendly` })),
+export const modelPolishJson = (rewritten = false, pageCount: number = PAGE_COUNT) => ({
+  pages: Array.from({ length: pageCount }, (_, i) => ({ text: `Final text ${i}.`, imagePrompt: `Pip scene ${i}, friendly` })),
   rewritten,
 })
 

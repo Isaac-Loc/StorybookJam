@@ -1,4 +1,4 @@
-import { isExpired, PAGE_COUNT, PAGE_TEXT_MAX } from '../../game'
+import { isExpired, PAGE_TEXT_MAX, storyPageCount } from '../../game'
 import { reserveSpend } from './budget'
 import { fail, findMembership, listPages, loadGame, ok } from './helpers'
 import type { GameAction, Loaded, NarrationRecord, PageRecord, Tools } from './helpers'
@@ -76,9 +76,9 @@ export async function runNarration(
   const game = await loadGame(tools, gameId)
   if (!game) return
   const pages = await listPages(tools, gameId)
-  // The reveal only leaves narration pending after the safety pass. All four
+  // The reveal only leaves narration pending after the safety pass. All
   // pages must fit the cap before we pay for any of them.
-  const canNarrate = enabled && pages.length === PAGE_COUNT &&
+  const canNarrate = enabled && pages.length === storyPageCount(game.data.pageCount) &&
     pages.every(({ data }) => data.text.length > 0 && data.text.length <= PAGE_TEXT_MAX)
   await Promise.allSettled(
     pages.filter(({ data }) => data.narrationStatus === 'pending').map(async (page) => {
@@ -99,7 +99,7 @@ export const getNarration: GameAction = async ({ userId, params, tools }) => {
   }
   if (isExpired(game.data, Date.now())) return fail('This room has expired.')
   if (game.data.phase !== 'ready') return fail('The story is still being prepared.')
-  const result = await tools.query<NarrationRecord>('narrations', { where: { gameId: game.id }, limit: PAGE_COUNT })
+  const result = await tools.query<NarrationRecord>('narrations', { where: { gameId: game.id }, limit: storyPageCount(game.data.pageCount) })
   if (!result.success) return fail('Could not load the narration.')
   return ok(result.data.records.flatMap(({ data: { idx, audioUrl } }) =>
     isAudioUrl(audioUrl) ? [{ idx, audioUrl }] : [],

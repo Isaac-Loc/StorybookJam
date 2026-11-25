@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BLANK_COUNT, PAGE_TEXT_MAX, STORY_PAGES, WORD_MAX_LENGTH, fillTemplate } from '../../game'
+import { BLANK_COUNT, LEGACY_PAGE_COUNT, PAGE_COUNT, PAGE_TEXT_MAX, STORY_PAGES, WORD_MAX_LENGTH, fillTemplate } from '../../game'
 import { cleanupExpiredGames } from './cleanup'
 import { createFakeTools } from './fakeTools'
 import { finishIfSettled } from './images'
@@ -9,10 +9,10 @@ import { runAction, seedDraft, seedFilledBlanks, seedGame, seedPages } from './t
 
 const audioUrl = 'data:audio/mpeg;base64,SUQz'
 
-async function prepare() {
+async function prepare(pageCount: number = PAGE_COUNT) {
   const tools = createFakeTools()
-  const gameId = await seedGame(tools, { phase: 'generating' })
-  await seedPages(tools, gameId, ['ready', 'ready', 'ready', 'ready'])
+  const gameId = await seedGame(tools, { phase: 'generating', ...(pageCount === PAGE_COUNT ? { pageCount } : {}) })
+  await seedPages(tools, gameId, Array(pageCount).fill('ready'))
   for (const row of tools.rows('pages')) {
     await tools.update('pages', row.recordId, { narrationStatus: 'pending' })
   }
@@ -28,31 +28,32 @@ describe('narrated stories', () => {
     for (const word of words) expect(pages.join('')).toContain(word)
   })
 
-  it('prepares each clip once and only serves audio to room members after generation', async () => {
-    const { tools, gameId } = await prepare()
+  it.each([PAGE_COUNT, LEGACY_PAGE_COUNT])('prepares each clip once and only serves audio to room members after generation (%s pages)', async (pageCount) => {
+    const { tools, gameId } = await prepare(pageCount)
+    const indices = Array.from({ length: pageCount }, (_, idx) => idx)
     await finishIfSettled(tools, gameId)
     expect(tools.rows('games')[0].data.phase).toBe('generating')
     expect(await runAction(getNarration, 'host', tools, { gameId })).toMatchObject({ success: false })
     await runNarration(tools, gameId, true)
     await runNarration(tools, gameId, true)
-    expect(tools.integrationCalls).toEqual([0, 1, 2, 3].map((idx) => ({
+    expect(tools.integrationCalls).toEqual(indices.map((idx) => ({
       endpoint: 'elevenlabs/generate-speech',
       body: { text: `page ${idx}`, model_id: 'eleven_flash_v2_5', output_format: 'mp3_22050_32' },
     })))
-    expect(tools.rows('spendLedger').map((row) => row.data.credits)).toEqual([3, 3, 3, 3])
+    expect(tools.rows('spendLedger').map((row) => row.data.credits)).toEqual(Array(pageCount).fill(3))
     expect(tools.rows('pages').every((row) => !('audioUrl' in row.data))).toBe(true)
 
     await finishIfSettled(tools, gameId)
     expect(await runAction(getNarration, 'outsider', tools, { gameId })).toMatchObject({ success: false })
     expect(await runAction(getNarration, 'p2', tools, { gameId })).toMatchObject({
       success: true,
-      data: [0, 1, 2, 3].map((idx) => ({ idx, audioUrl })),
+      data: indices.map((idx) => ({ idx, audioUrl })),
     })
     await tools.update('games', gameId, { expiresAt: Date.now() - 1 })
     expect(await runAction(getNarration, 'p2', tools, { gameId })).toMatchObject({ success: false })
     await cleanupExpiredGames(tools, Date.now(), 1)
     expect(tools.rows('narrations')).toHaveLength(0)
-    expect(tools.rows('spendLedger')).toHaveLength(4)
+    expect(tools.rows('spendLedger')).toHaveLength(pageCount)
   })
 
   it('queues a recovered reveal when only narration is pending', async () => {
@@ -75,7 +76,7 @@ describe('narrated stories', () => {
     await runNarration(tools, gameId, reason !== 'generation off')
     await finishIfSettled(tools, gameId)
     expect(tools.integrationCalls).toHaveLength(0)
-    expect(tools.rows('pages').map((row) => row.data.narrationStatus)).toEqual(Array(4).fill('skipped'))
+    expect(tools.rows('pages').map((row) => row.data.narrationStatus)).toEqual(Array(PAGE_COUNT).fill('skipped'))
     expect(tools.rows('games')[0].data.phase).toBe('ready')
   })
 })

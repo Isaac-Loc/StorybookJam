@@ -11,7 +11,7 @@
  */
 
 import type { CollectionSchema, RolePermissions } from 'deepspace/schema'
-import { GAME_PHASES, IMAGE_STATUSES, NARRATION_STATUSES } from '../game'
+import { GAME_PHASES, IMAGE_STATUSES, LEGACY_PAGE_COUNT, NARRATION_STATUSES } from '../game'
 import { DEFAULT_STORY_THEME, STORY_THEMES } from '../story-themes'
 
 const NONE: RolePermissions = { read: false, create: false, update: false, delete: false }
@@ -50,6 +50,7 @@ export const gamesSchema: CollectionSchema = {
     num('filledCount'),
     json('finishedPlayerIds', []),
     num('totalBlanks'),
+    num('pageCount', LEGACY_PAGE_COUNT),
     text('title', { default: '' }),
   ],
   uniqueOn: ['code'],

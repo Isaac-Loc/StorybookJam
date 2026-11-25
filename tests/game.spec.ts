@@ -152,7 +152,7 @@ test('two players: blanks stay private, then the story reveals with both words',
   // B finishes; the story reveals for everybody with all six words.
   const bWords = await fillAll(b.page, 'Bobzz')
   for (const p of [a.page, b.page]) {
-    await expect(p.getByTestId('story-page')).toHaveCount(4, { timeout: 30_000 })
+    await expect(p.getByTestId('story-page')).toHaveCount(6, { timeout: 30_000 })
     await expect(p.getByTestId('story-title')).toHaveText(/Crater Caper/)
     await expect(p.getByTestId('active-story-theme')).toHaveText('Space Trouble')
     await expect(p.getByTestId('story-page').filter({ visible: true })).toHaveCount(1)
@@ -161,13 +161,16 @@ test('two players: blanks stay private, then the story reveals with both words',
     await expect(p.getByRole('button', { name: 'Page 2', exact: true })).toHaveAttribute('aria-current', 'page')
     await p.getByRole('button', { name: 'Previous' }).click()
     await expect(p.getByRole('button', { name: 'Page 1', exact: true })).toHaveAttribute('aria-current', 'page')
+    await p.getByRole('button', { name: 'Page 6', exact: true }).click()
+    await expect(p.getByTestId('story-page').filter({ visible: true })).toContainText('Page 6 of 6')
+    await expect(p.getByRole('button', { name: 'Next' })).toBeDisabled()
     const story = await p.getByTestId('story-page').allInnerTexts()
     const all = story.join('\n')
     for (const w of [...aWords, ...bWords]) expect(all).toContain(w)
     expect(all).not.toMatch(/\{\d\}/)
     // Specs run with generation OFF (tests/helpers/generation-off.mjs): the fixed
     // story, and every illustration is 'skipped'. This also proves nothing is spent.
-    await expect(p.getByTestId('illustration-skipped')).toHaveCount(4)
+    await expect(p.getByTestId('illustration-skipped')).toHaveCount(6)
     await expect(p.getByRole('button', { name: 'Play narration' })).toHaveCount(0)
     await expect(p.getByTestId('play-again')).toBeVisible()
   }
@@ -206,7 +209,7 @@ test('solo room: player word, safety word, timeout fill, and newcomers are refus
   await expect(b.page.getByText('No room with that code.')).toBeVisible({ timeout: 15_000 })
 
   // The timer runs out: the server fills the rest and the story reveals.
-  await expect(a.page.getByTestId('story-page')).toHaveCount(4, { timeout: 100_000 })
+  await expect(a.page.getByTestId('story-page')).toHaveCount(6, { timeout: 100_000 })
   const story = (await a.page.getByTestId('story-page').allInnerTexts()).join('\n')
   expect(story).toContain('Onlyword')
   expect(story).not.toMatch(/\{\d\}/)

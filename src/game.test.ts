@@ -148,7 +148,7 @@ describe('fillTemplate', () => {
     const used = new Set<number>()
     for (const page of STORY_PAGES) for (const m of page.matchAll(/\{(\d+)\}/g)) used.add(Number(m[1]))
     expect([...used].sort()).toEqual([0, 1, 2, 3, 4, 5])
-    expect(STORY_PAGES).toHaveLength(4)
+    expect(STORY_PAGES).toHaveLength(6)
     const values = BLANK_SPECS.map((s) => s.safety[0])
     for (const page of STORY_PAGES) expect(fillTemplate(page, values)).not.toMatch(/\{\d+\}/)
   })

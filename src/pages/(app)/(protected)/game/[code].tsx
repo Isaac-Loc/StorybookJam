@@ -59,7 +59,7 @@ export default function GamePage() {
   // generating / ready (and the legacy 'revealed') all show the story; the
   // illustrations fill in live while the phase is 'generating'.
   if (phase === 'generating' || phase === 'ready' || phase === 'revealed') {
-    return <Revealed gameId={game.recordId} title={game.data.title} phase={phase} storyTheme={game.data.storyTheme} />
+    return <Revealed gameId={game.recordId} title={game.data.title} phase={phase} storyTheme={game.data.storyTheme} pageCount={game.data.pageCount} />
   }
 
   return <p className="py-16 text-center text-muted-foreground">Something went wrong with this room ({phase}).</p>

@@ -15,13 +15,14 @@
  * prose in HTML text, reveal animations in CSS keyframes rather than JS-driven
  * initial states. `<Seo>` comes first and reads src/seo.ts.
  *
- * The sample book below is fixed, committed content (public/sample/*): the page
- * never calls a model, so visitors can see the output without spending credits.
+ * The sample book and recording are bundled assets. Visiting the page and
+ * playing the audio do not use generation credits.
  */
 
 import { Link } from 'react-router-dom'
 import { ArrowDown, ArrowRight, BookOpen, Headphones, PencilLine, Users } from 'lucide-react'
 import { Brand } from '../components/Brand'
+import sampleNarrationUrl from '../assets/sample-narration.mp3?url'
 import { ThemeArtwork } from '../components/game/ThemeArtwork'
 import { Seo } from '../components/Seo'
 import { seo } from '../seo'
@@ -121,6 +122,12 @@ export default function Landing() {
               <div className="jam-section-heading">
                 <div><p className="jam-eyebrow"><BookOpen size={18} aria-hidden /> Sample book</p><h2 id="sample-heading">{SAMPLE_TITLE}</h2></div>
                 <p>A small taste of Silly Surprise.</p>
+              </div>
+              <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-3">
+                <p id="sample-audio-label" className="flex items-center gap-2 px-1 font-bold">
+                  <Headphones size={18} aria-hidden /> Listen to the sample
+                </p>
+                <audio aria-labelledby="sample-audio-label" className="h-10 w-full max-w-md" controls preload="none" src={sampleNarrationUrl} />
               </div>
               <ol className="jam-sample-grid">
                 {SAMPLE_PAGES.map((page, i) => (

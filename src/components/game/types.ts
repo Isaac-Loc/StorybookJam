@@ -19,6 +19,7 @@ export type GameView = {
   expiresAt: number
   filledCount: number
   finishedPlayerIds?: string[]
+  pageCount?: number
   totalBlanks: number
   title: string
 }

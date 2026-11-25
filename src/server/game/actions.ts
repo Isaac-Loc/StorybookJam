@@ -357,6 +357,7 @@ export const startGame: GameAction = async ({ userId, params, tools, env }) => {
       storyTheme: theme,
       phaseEndsAt: Date.now() + FILL_SECONDS * 1000,
       totalBlanks: BLANK_COUNT,
+      pageCount: story.pages.length,
       filledCount: 0,
       playerIds,
       playerNames,

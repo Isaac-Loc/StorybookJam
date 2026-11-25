@@ -3,7 +3,7 @@
  * responses. Timing is injected so nothing waits in real time.
  */
 import { describe, expect, it } from 'vitest'
-import { ART_STYLE, GENERATION_CAP_CREDITS, IMAGE_MAX_COST_USD, MAX_PAGE_RETRIES } from '../../game'
+import { ART_STYLE, GENERATION_CAP_CREDITS, IMAGE_MAX_COST_USD, MAX_PAGE_RETRIES, PAGE_COUNT } from '../../game'
 import { getStoryTheme } from '../../story-themes'
 import { retryPage, tick } from './actions'
 import { createFakeTools } from './fakeTools'
@@ -45,7 +45,7 @@ function scriptFal(t: FakeTools, opts: { failFirst?: number; neverCompletes?: bo
 
 async function game(t: FakeTools, statuses = ['pending', 'pending', 'pending', 'pending'], retries = 0) {
   const gameId = await seedGame(t, { phase: 'generating' })
-  await seedDraft(t, gameId, { finalPrompts: ['p0', 'p1', 'p2', 'p3'] })
+  await seedDraft(t, gameId, { finalPrompts: statuses.map((_, idx) => `p${idx}`) })
   await seedPages(t, gameId, statuses, retries)
   return gameId
 }
@@ -55,13 +55,13 @@ const falCalls = (t: FakeTools, e: string) => t.integrationCalls.filter((c) => c
 describe('runImageJob', () => {
   it('draws every pending page, stores the url, and moves the game to ready', async () => {
     const t = createFakeTools('host')
-    const gameId = await game(t)
+    const gameId = await game(t, Array(PAGE_COUNT).fill('pending'))
     scriptFal(t)
     await runImageJob(t, gameId, run())
-    expect(statuses(t)).toEqual(['ready', 'ready', 'ready', 'ready'])
+    expect(statuses(t)).toEqual(Array(PAGE_COUNT).fill('ready'))
     expect(t.rows('pages').every((p) => p.data.imageUrl === URL_OK)).toBe(true)
     expect(t.rows('games')[0].data.phase).toBe('ready')
-    expect(t.rows('spendLedger')).toHaveLength(4)
+    expect(t.rows('spendLedger')).toHaveLength(PAGE_COUNT)
   })
 
   it('sends only the moderated prompt, the fixed style, and always the cost ceiling', async () => {

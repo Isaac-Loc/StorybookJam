@@ -3,7 +3,7 @@
  * fake with scripted anthropic responses. No real calls, no spend.
  */
 import { describe, expect, it } from 'vitest'
-import { COST_ESTIMATE_CREDITS, GENERATION_CAP_CREDITS } from '../../game'
+import { COST_ESTIMATE_CREDITS, GENERATION_CAP_CREDITS, PAGE_COUNT } from '../../game'
 import { setStoryTheme, startGame } from './actions'
 import { generationEnabled } from './deps'
 import { askClaude } from './llm'
@@ -153,6 +153,7 @@ describe('startGame story drafting', () => {
     })
     await runAction(startGame, 'host', t, { gameId }, envFor(true))
     expect(t.rows('blanks')).toHaveLength(6)
+    expect(t.rows('games')[0].data.pageCount).toBe(6)
     expect(t.rows('games')[0].data.phaseEndsAt as number).toBeGreaterThan(Date.now())
   })
 })
@@ -172,7 +173,7 @@ describe('reveal', () => {
     const d = deps(true)
     await reveal(t, gameId, d)
 
-    expect(t.rows('pages').map((p) => p.data.imageStatus)).toEqual(['pending', 'pending', 'pending', 'pending'])
+    expect(t.rows('pages').map((p) => p.data.imageStatus)).toEqual(Array(PAGE_COUNT).fill('pending'))
     expect(t.rows('pages')[0].data.text).toBe('Final text 0.')
     expect(t.rows('games')[0].data.phase).toBe('generating')
     expect((t.rows('storyDrafts')[0].data.finalPrompts as string[])[0]).toBe('Pip scene 0, friendly')
@@ -183,6 +184,23 @@ describe('reveal', () => {
     expect(JSON.stringify(calls[0].body)).toContain('wobbly')
     // pages never carry image prompts (clients can read pages)
     expect(JSON.stringify(t.rows('pages').map((p) => p.data))).not.toContain('Pip scene')
+  })
+
+  it('polishes an existing four-page draft at its original length', async () => {
+    const t = createFakeTools('host')
+    const gameId = await seedGame(t)
+    const legacy = modelStoryJson().pages.slice(0, 4)
+    await seedDraft(t, gameId, {
+      pages: legacy.map(({ text }) => text),
+      imagePrompts: legacy.map(({ imagePrompt }) => imagePrompt),
+    })
+    await seedFilledBlanks(t, gameId, WORDS)
+    t.onIntegration(() => claudeReply(modelPolishJson(true, 4)))
+    const d = deps(true)
+    await reveal(t, gameId, d)
+    expect(t.rows('games')[0].data).toMatchObject({ phase: 'generating', pageCount: 4 })
+    expect(t.rows('pages').map((row) => row.data.text)).toEqual(['Final text 0.', 'Final text 1.', 'Final text 2.', 'Final text 3.'])
+    expect(d.queued).toEqual([gameId])
   })
 
   const noImageCases: [string, (t: FakeTools) => void | Promise<void>, boolean][] = [
@@ -200,7 +218,7 @@ describe('reveal', () => {
       await setup(t)
       const d = deps(true)
       await reveal(t, gameId, d)
-      expect(t.rows('pages').map((p) => p.data.imageStatus)).toEqual(['skipped', 'skipped', 'skipped', 'skipped'])
+      expect(t.rows('pages').map((p) => p.data.imageStatus)).toEqual(Array(PAGE_COUNT).fill('skipped'))
       expect(t.rows('pages')[0].data.text).toContain('wobbly') // plain substituted text
       expect(t.rows('games')[0].data.phase).toBe('ready')
       expect(d.queued).toHaveLength(0)
@@ -216,7 +234,7 @@ describe('reveal', () => {
     await reveal(t, gameId, d)
     expect(t.integrationCalls).toHaveLength(0)
     expect(t.rows('spendLedger')).toHaveLength(0)
-    expect(t.rows('pages').map((p) => p.data.imageStatus)).toEqual(['skipped', 'skipped', 'skipped', 'skipped'])
+    expect(t.rows('pages').map((p) => p.data.imageStatus)).toEqual(Array(PAGE_COUNT).fill('skipped'))
     expect(t.rows('games')[0].data.phase).toBe('ready')
   })
 
@@ -227,7 +245,7 @@ describe('reveal', () => {
     const d = deps(true)
     await Promise.all([reveal(t, gameId, d), reveal(t, gameId, d), reveal(t, gameId, d)])
     expect(t.integrationCalls).toHaveLength(1)
-    expect(t.rows('pages')).toHaveLength(4)
+    expect(t.rows('pages')).toHaveLength(PAGE_COUNT)
     expect(d.queued).toHaveLength(1)
   })
 
@@ -236,7 +254,7 @@ describe('reveal', () => {
     const gameId = await filledGame(t)
     t.onIntegration(() => claudeReply(modelPolishJson()))
     await reveal(t, gameId, { enabled: true, enqueueImages: async () => { throw new Error('queue down') } })
-    expect(t.rows('pages').map((p) => p.data.imageStatus)).toEqual(['failed', 'failed', 'failed', 'failed'])
+    expect(t.rows('pages').map((p) => p.data.imageStatus)).toEqual(Array(PAGE_COUNT).fill('failed'))
     expect(t.rows('games')[0].data.phase).toBe('ready')
   })
 })

@@ -50,6 +50,7 @@ export type GameRecord = {
   expiresAt: number
   filledCount: number
   finishedPlayerIds?: string[]
+  pageCount?: number
   totalBlanks: number
   title: string
 }
@@ -109,7 +110,7 @@ export function isDuplicate(result: ActionResult<unknown>): boolean {
   return !result.success && /duplicate/i.test(result.error)
 }
 
-/** Safety margin above any real page size (6 blanks, 6 players, 4 pages). */
+/** Safety margin above any real page size (6 blanks, 6 players, 6 pages). */
 const QUERY_LIMIT = 50
 
 /* Typed loaders. Each returns null when the record is missing (or the lookup failed). */

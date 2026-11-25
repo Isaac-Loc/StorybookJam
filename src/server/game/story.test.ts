@@ -66,9 +66,9 @@ describe('parseModelJson', () => {
 })
 
 describe('validatePolished', () => {
-  it('accepts four clean pages', () => {
+  it('accepts six clean pages for new stories', () => {
     const r = validatePolished(modelPolishJson(true))
-    expect(r?.pages).toHaveLength(4)
+    expect(r?.pages).toHaveLength(6)
   })
   it('rejects wrong page counts, leftover placeholders and empty prompts', () => {
     const j = modelPolishJson()
