@@ -4,9 +4,9 @@
 - [Read the source on GitHub](https://github.com/Isaac-Loc/StorybookJam/tree/dev)
 
 I built a multiplayer fill-in-the-blank party game. The host opens a room,
-picks a theme, and shares the code. Players each see their own secret prompts
-and have 75 seconds to fill them. Everyone discovers what they wrote together
-when the six-page illustrated story starts reading itself aloud. The landing
+picks a theme, and shares the code. Players see their own secret prompts one
+at a time and have 75 seconds to fill them. Everyone discovers what they
+wrote together when the six-page illustrated story starts reading itself aloud. The landing
 page has a free sample, *The Fax Machine Knows*, that anyone can read or listen
 to without signing in.
 

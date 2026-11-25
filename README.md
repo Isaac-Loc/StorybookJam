@@ -13,8 +13,9 @@ Try it: https://storybookjam.app.space
    per page. Each blank is
    secretly dealt to a player. You see only your own labels ("an animal", "a
    place"), never the surrounding story.
-3. A 75-second timer runs. Stuck? Tap "Use a safety word". When time runs out
-   the server fills whatever is left.
+3. A 75-second timer runs while you answer one prompt at a time. Tap
+   "Use a safety word" to fill a prompt and move on. When time runs out the
+   server fills whatever is left.
 4. When every blank is filled, a second model pass swaps harmful words for
    harmless ones. Illustrations and narration are generated for each page,
    and the read-aloud advances the slideshow.

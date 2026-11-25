@@ -14,12 +14,11 @@ change behavior, limits or decisions, update the relevant section.
 
 ## 0. Resume here (state snapshot, 2026-11-24 ET)
 
-The previous verified live release and GitHub `dev` head were at `fdd7d31`,
-with original landing art, theme covers, and the six-page sample
-“The Fax Machine Knows.” This checkout updates the portal submission note
-and replaces the browser tab icon with the gold book mark. Verify deployment
-by comparing `npx deepspace releases` with `git rev-parse --short HEAD`.
-A full round at the current maximum text length is unverified live.
+The previous verified live release and GitHub `dev` head were at `ccf1e0e`,
+with the current submission note and the gold book tab icon. This checkout
+shows one word prompt at a time. Verify deployment by comparing
+`npx deepspace releases` with `git rev-parse --short HEAD`. A full round at
+the current maximum text length is unverified live.
 
 First five minutes in a new session (read-only, free):
 ```bash
@@ -67,7 +66,8 @@ A language model writes a six-page story in that theme with 6 blanks; each
 blank is secretly dealt to a player, who sees only that
 blank's label ("an animal") and never the story. A 75-second timer runs; a
 player can tap "Use a safety word" and the server fills anything left when time
-runs out. A checkmark shows when a player has filled all their own blanks.
+runs out. Players see one entry at a time and advance when their previous
+word is saved. A checkmark shows when a player has filled all their own blanks.
 When every blank is filled, a second model call rewrites harmful player words,
 then an illustration and narration clip are generated for each page. The book
 attempts playback when ready and turns a page when its clip ends. Rooms expire
@@ -111,6 +111,7 @@ Done and live (release history from `npx deepspace releases`):
 | later | 4414442 | Six-page stories and bundled sample narration |
 | later | b5a2b5e | Longer pages, deadpan tone, and larger finished-story reader |
 | later | fdd7d31 | Original landing and cover art, plus the six-page fax demo |
+| later | ccf1e0e | Current submission note and gold book tab icon |
 
 Use `npx deepspace releases` to verify the currently live commit.
 
@@ -171,8 +172,10 @@ exact transitions.
 4. `submitBlank` / `useSafetyWord`: caller must own the blank and be a current
    member; phase must be `filling`. A late call runs the expiry path. The server
    recount publishes which players filled every assigned blank. Chosen safety
-   words count as submitted. Server timeout fills do not count. Labels and
-   answers remain private.
+   words count as submitted. Server timeout fills do not count. The client
+   shows the first unfilled blank from the player's synced records, moves on
+   after that record updates, and shows a waiting state when they finish.
+   Labels and answers remain private.
 5. `tick`: any member's browser calls it when the countdown hits 0 (and while
    generating, every 30 s). Idempotent: fills empty blanks with safety words
    after the deadline, retries a failed reveal, sweeps stuck pages.
@@ -333,7 +336,7 @@ Prompts specified full-bleed, text-free scenes with an editorial look:
   `tests/helpers/generation-off.mjs`, which appends `GENERATION_ENABLED=false`
   to the generated `.dev.vars` (skipped when `STORYBOOK_REAL_GENERATION=1`, which
   spends real credits). The spec checks skipped illustrations, no narration
-  control, shared player checkmarks, and manual slideshow navigation. The
+  control, one-at-a-time entry, shared player checkmarks, and manual slideshow navigation. The
   two-player case also checks that only the host can choose a theme, the other
   player sees the lobby changes, and both get the locked theme at reveal.
 - E2E limits: room creation is rate limited (5 per 10 min per user, 10 active
@@ -485,3 +488,5 @@ file. So:
 - 2026-11-24 (ET, evening): refreshed the submission note and project docs,
   added the gold book tab icon, and ran the complete local browser suite
   with generation disabled.
+- 2026-11-24 (ET, evening): changed the fill screen to show one word prompt at
+  a time while preserving the shared countdown and player completion.

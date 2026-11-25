@@ -10,9 +10,9 @@
  * the phase leaves `filling`.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type Ref } from 'react'
 import { Check, Clock3 } from 'lucide-react'
-import { Badge, Button, Input, useToast } from '@/components/ui'
+import { Button, Input, useToast } from '@/components/ui'
 import { useQuery } from 'deepspace'
 import { callAction } from '@/lib/callAction'
 import { WORD_MAX_LENGTH } from '../../game'
@@ -51,6 +51,18 @@ export function Filling({ gameId, game }: { gameId: string; game: GameView }) {
   }, [needsTick, gameId])
 
   const mine = [...records].sort((a, b) => a.data.idx - b.data.idx)
+  const next = mine.find((record) => record.data.filled !== 1)
+  const nextId = next?.recordId
+  const filled = mine.filter((record) => record.data.filled === 1).length
+  const input = useRef<HTMLInputElement>(null)
+  const previousId = useRef(nextId)
+  useEffect(() => {
+    if (previousId.current && nextId && previousId.current !== nextId) {
+      input.current?.focus({ preventScroll: true })
+    }
+    previousId.current = nextId
+  }, [nextId])
+
   const mm = String(Math.floor(secondsLeft / 60))
   const ss = String(secondsLeft % 60).padStart(2, '0')
   const theme = getStoryTheme(game.storyTheme)
@@ -91,20 +103,38 @@ export function Filling({ gameId, game }: { gameId: string; game: GameView }) {
         </p>
       )}
 
-      {mine.map((b) => (
-        <BlankCard key={b.recordId} blankId={b.recordId} blank={b.data} />
-      ))}
+      {next && (
+        <BlankCard
+          key={next.recordId}
+          blankId={next.recordId}
+          label={next.data.label}
+          number={filled + 1}
+          total={mine.length}
+          input={input}
+        />
+      )}
+      {mine.length > 0 && !next && (
+        <div className="jam-panel p-4 sm:p-5" role="status" data-testid="words-complete">
+          <p className="flex items-center gap-2 text-base font-extrabold"><Check size={18} aria-hidden /> Your words are in.</p>
+          <p className="mt-1 text-muted-foreground">The story will start when the remaining blanks are filled.</p>
+        </div>
+      )}
     </div>
   )
 }
 
-function BlankCard({ blankId, blank }: { blankId: string; blank: BlankView }) {
+function BlankCard({ blankId, label, number, total, input }: {
+  blankId: string
+  label: string
+  number: number
+  total: number
+  input: Ref<HTMLInputElement>
+}) {
   const { error } = useToast()
   const [value, setValue] = useState('')
   const [busy, setBusy] = useState<'submit' | 'safety' | null>(null)
-  const done = blank.filled === 1
-
   async function send(kind: 'submit' | 'safety') {
+    if (busy) return
     setBusy(kind)
     const res =
       kind === 'submit'
@@ -116,51 +146,39 @@ function BlankCard({ blankId, blank }: { blankId: string; blank: BlankView }) {
 
   return (
     <section className="jam-panel space-y-3 p-4 sm:p-5" data-testid="blank-card">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-base font-extrabold">
-          Give me <span data-testid="blank-label">{blank.label}</span>
-        </h2>
-        {done && <Badge variant="success">{blank.source === 'player' ? 'Done' : 'Safety word'}</Badge>}
-      </div>
-
-      {done ? (
-        <p className="text-lg" data-testid="blank-value">
-          {blank.value}
-        </p>
-      ) : (
-        <>
-          <form
-            className="flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault()
-              void send('submit')
-            }}
-          >
-            <Input
-              data-testid="blank-input"
-              aria-label={`Your word: ${blank.label}`}
-              value={value}
-              maxLength={WORD_MAX_LENGTH}
-              className="min-w-0"
-              placeholder="Type something silly"
-              onChange={(e) => setValue(e.target.value)}
-            />
-            <Button type="submit" data-testid="blank-submit" loading={busy === 'submit'} disabled={busy !== null || !value.trim()}>
-              Submit
-            </Button>
-          </form>
-          <Button
-            variant="ghost"
-            size="sm"
-            data-testid="blank-safety"
-            loading={busy === 'safety'}
-            disabled={busy !== null}
-            onClick={() => send('safety')}
-          >
-            Use a safety word
-          </Button>
-        </>
-      )}
+      <p className="jam-eyebrow" data-testid="word-step">Word {number} of {total}</p>
+      <h2 className="text-base font-extrabold">Give me <span data-testid="blank-label">{label}</span></h2>
+      <form
+        className="flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void send('submit')
+        }}
+      >
+        <Input
+          ref={input}
+          data-testid="blank-input"
+          aria-label={`Your word: ${label}`}
+          value={value}
+          maxLength={WORD_MAX_LENGTH}
+          className="min-w-0"
+          placeholder="Type something silly"
+          onChange={(e) => setValue(e.target.value)}
+        />
+        <Button type="submit" data-testid="blank-submit" loading={busy === 'submit'} disabled={busy !== null || !value.trim()}>
+          Submit
+        </Button>
+      </form>
+      <Button
+        variant="ghost"
+        size="sm"
+        data-testid="blank-safety"
+        loading={busy === 'safety'}
+        disabled={busy !== null}
+        onClick={() => send('safety')}
+      >
+        Use a safety word
+      </Button>
     </section>
   )
 }

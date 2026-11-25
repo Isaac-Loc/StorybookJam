@@ -64,23 +64,22 @@ async function joinViaLink(page: Page, code: string, name: string) {
   await page.getByTestId('join-submit').click()
 }
 
-async function myLabels(page: Page): Promise<string[]> {
-  return page.getByTestId('blank-label').allInnerTexts()
-}
-
-/** Submit a word for every open blank card on the page, one at a time. */
-async function fillAll(page: Page, prefix: string): Promise<string[]> {
+/** Walk the prompts in the order the player actually sees them. */
+async function fillAll(page: Page, prefix: string, count: number) {
+  const labels: string[] = []
   const words: string[] = []
-  for (let n = 0; ; n++) {
-    const input = page.getByTestId('blank-input').first()
-    if (!(await input.isVisible().catch(() => false))) break
+  for (let n = 0; n < count; n++) {
+    await expect(page.getByTestId('word-step')).toHaveText(`Word ${n + 1} of ${count}`)
+    const input = page.getByTestId('blank-input')
+    await expect(input).toHaveCount(1)
+    await expect(input).toHaveValue('')
+    labels.push(await page.getByTestId('blank-label').innerText())
     const word = `${prefix}${n}`
     await input.fill(word)
-    await page.getByTestId('blank-submit').first().click()
-    await expect(page.getByTestId('blank-value').filter({ hasText: word })).toBeVisible({ timeout: 15_000 })
+    await page.getByTestId('blank-submit').click()
     words.push(word)
   }
-  return words
+  return { labels, words }
 }
 
 test('two players: blanks stay private, then the story reveals with both words', async ({ users }) => {
@@ -108,25 +107,17 @@ test('two players: blanks stay private, then the story reveals with both words',
 
   await a.page.getByTestId('start-game').click()
   for (const p of [a.page, b.page]) {
-    await expect(p.getByTestId('blank-card').first()).toBeVisible({ timeout: 20_000 })
+    await expect(p.getByTestId('blank-card')).toHaveCount(1, { timeout: 20_000 })
+    await expect(p.getByTestId('word-step')).toHaveText('Word 1 of 3')
     await expect(p.getByTestId('active-story-theme')).toHaveText('Space Trouble')
     await expect(p.getByTestId('player-progress').getByRole('listitem')).toHaveCount(2)
     await expect(p.getByTestId('player-progress').locator('[data-finished="true"]')).toHaveCount(0)
   }
 
-  // 6 blanks dealt 3 + 3, no overlap.
-  const aLabels = await myLabels(a.page)
-  const bLabels = await myLabels(b.page)
-  expect(aLabels).toHaveLength(3)
-  expect(bLabels).toHaveLength(3)
-  expect([...aLabels, ...bLabels].sort()).toEqual([...BLANK_LABELS].sort())
-
-  // B's page never shows A's labels...
-  const bText = await b.page.locator('body').innerText()
-  for (const label of aLabels) expect(bText).not.toContain(label)
-
   // A answers all of theirs; B must still see none of it, on screen or on the wire.
-  const aWords = await fillAll(a.page, 'Alicezz')
+  const { labels: aLabels, words: aWords } = await fillAll(a.page, 'Alicezz', 3)
+  await expect(a.page.getByTestId('words-complete')).toBeVisible()
+  await expect(a.page.getByTestId('blank-input')).toHaveCount(0)
   await expect(b.page.getByTestId('progress')).toContainText('3 of 6', { timeout: 20_000 })
   for (const p of [a.page, b.page]) {
     const players = p.getByTestId('player-progress').getByRole('listitem')
@@ -134,13 +125,14 @@ test('two players: blanks stay private, then the story reveals with both words',
     await expect(players.filter({ hasText: 'Bob' })).toHaveAttribute('data-finished', 'false')
   }
   const bTextAfter = await b.page.locator('body').innerText()
+  for (const label of aLabels) expect(bTextAfter).not.toContain(label)
   for (const w of aWords) expect(bTextAfter).not.toContain(w)
   const wire = bFrames.join('\n')
   expect(wire.length).toBeGreaterThan(0) // the capture itself works
   for (const label of aLabels) expect(wire).not.toContain(label)
   for (const w of aWords) expect(wire).not.toContain(w)
-  // Sanity: B's own labels DO travel to B, so the assertions above are meaningful.
-  for (const label of bLabels) expect(wire).toContain(label)
+  const bLabelsOnWire = BLANK_LABELS.filter((label) => wire.includes(label))
+  expect([...aLabels, ...bLabelsOnWire].sort()).toEqual([...BLANK_LABELS].sort())
 
   // The story text and title must not travel to B before the reveal either.
   // (Distinctive bits of the title and of two different page templates.)
@@ -151,7 +143,8 @@ test('two players: blanks stay private, then the story reveals with both words',
   }
 
   // B finishes; the story reveals for everybody with all six words.
-  const bWords = await fillAll(b.page, 'Bobzz')
+  const { labels: bLabels, words: bWords } = await fillAll(b.page, 'Bobzz', 3)
+  expect([...bLabels].sort()).toEqual([...bLabelsOnWire].sort())
   for (const p of [a.page, b.page]) {
     await expect(p.getByTestId('story-page')).toHaveCount(6, { timeout: 30_000 })
     await expect(p.getByTestId('story-title')).toHaveText(/Crater Caper/)
@@ -193,14 +186,20 @@ test('solo room: player word, safety word, timeout fill, and newcomers are refus
   const [a, b] = await users(['Storybook A', 'Storybook B'])
   const code = await createRoom(a.page, 'Solo')
   await a.page.getByTestId('start-game').click()
-  await expect(a.page.getByTestId('blank-card')).toHaveCount(6, { timeout: 20_000 })
+  await expect(a.page.getByTestId('blank-card')).toHaveCount(1, { timeout: 20_000 })
+  await expect(a.page.getByTestId('word-step')).toHaveText('Word 1 of 6')
 
   // One typed word and one safety word; leave four blanks for the timeout.
   await a.page.getByTestId('blank-input').first().fill('Onlyword')
   await a.page.getByTestId('blank-submit').first().click()
   await expect(a.page.getByTestId('progress')).toContainText('1 of 6', { timeout: 15_000 })
+  await expect(a.page.getByTestId('word-step')).toHaveText('Word 2 of 6')
+  await expect(a.page.getByTestId('blank-input')).toBeFocused()
   await a.page.getByTestId('blank-safety').first().click()
   await expect(a.page.getByTestId('progress')).toContainText('2 of 6', { timeout: 15_000 })
+  await expect(a.page.getByTestId('word-step')).toHaveText('Word 3 of 6')
+  await a.page.reload()
+  await expect(a.page.getByTestId('word-step')).toHaveText('Word 3 of 6')
   await expect(a.page.getByTestId('countdown')).toBeVisible()
 
   // While the game is running, a newcomer is refused and never shown the game...
